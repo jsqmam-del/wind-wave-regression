@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>해양 관측 데이터 회귀분석</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --bg: #eef3f4; --paper: #ffffff; --ink: #10263b; --muted: #5b6b78; --rule: #d5dee3;
+    --sea: #1d5c8a; --signal: #e2621b; --teal: #1f8a70; --warn: #b42318;
+    --font: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 15px; line-height: 1.6; }
+  header { background: var(--ink); color: #fff; padding: 22px 28px 20px; }
+  header h1 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.01em; }
+  header p { margin: 4px 0 0; color: #b8c7d3; font-size: 14px; }
+  .dataset-line { margin-top: 12px; font-size: 13px; color: #d9e4ec; font-variant-numeric: tabular-nums; }
+  .layout { display: grid; grid-template-columns: 290px 1fr; gap: 20px; padding: 20px 28px 40px; max-width: 1500px; margin: 0 auto; }
+  aside { background: var(--paper); border: 1px solid var(--rule); border-radius: 10px; padding: 18px; align-self: start; position: sticky; top: 16px; }
+  aside h2 { font-size: 14px; font-weight: 600; margin: 0 0 8px; }
+  aside section + section { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--rule); }
+  label.field { display: block; font-size: 13px; color: var(--muted); margin: 10px 0 4px; }
+  select, input[type=file] { width: 100%; font: inherit; font-size: 14px; }
+  select { padding: 7px 8px; border: 1px solid var(--rule); border-radius: 6px; background: #fff; color: var(--ink); }
+  .file-btn { display: block; text-align: center; padding: 9px; border: 1.5px dashed #9fb3c1; border-radius: 8px; cursor: pointer; font-size: 14px; color: var(--sea); }
+  .file-btn:hover { background: #f4f8fa; }
+  .file-btn input { display: none; }
+  .check { display: flex; gap: 8px; align-items: flex-start; font-size: 14px; margin-top: 4px; }
+  .note { font-size: 12.5px; color: var(--muted); margin: 6px 0 0; }
+  .err { color: var(--warn); font-size: 13px; margin-top: 8px; }
+  main { min-width: 0; }
+  .tabs { display: flex; gap: 4px; border-bottom: 2px solid var(--rule); margin-bottom: 16px; overflow-x: auto; }
+  .tabs button { font: inherit; font-size: 15px; background: none; border: none; padding: 10px 16px; cursor: pointer; color: var(--muted); border-bottom: 3px solid transparent; margin-bottom: -2px; white-space: nowrap; }
+  .tabs button[aria-selected=true] { color: var(--ink); font-weight: 600; border-bottom-color: var(--signal); }
+  .tabs button:focus-visible, select:focus-visible, .file-btn:focus-within, input:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+  .panel { display: none; } .panel.active { display: block; }
+  .card { background: var(--paper); border: 1px solid var(--rule); border-radius: 10px; padding: 16px 18px; margin-bottom: 16px; }
+  .card h3 { margin: 0 0 6px; font-size: 16px; }
+  .explain { color: var(--muted); font-size: 14px; margin: 0 0 12px; max-width: 78ch; }
+  .grid2 { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 16px; }
+  .chart { width: 100%; height: 420px; }
+  .controls { display: flex; flex-wrap: wrap; gap: 20px; align-items: end; margin-bottom: 4px; }
+  .controls label { font-size: 13px; color: var(--muted); display: block; margin-bottom: 4px; }
+  .controls .ctl { min-width: 180px; }
+  input[type=range] { width: 220px; accent-color: var(--signal); }
+  .val { font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 4px 0 14px; }
+  .metric { border-left: 3px solid var(--rule); padding: 2px 0 2px 12px; }
+  .metric.hl { border-left-color: var(--signal); }
+  .metric span { display: block; font-size: 12.5px; color: var(--muted); }
+  .metric b { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .eq { font-size: 15px; background: #f4f7f9; border-radius: 6px; padding: 8px 12px; margin: 4px 0 10px; font-variant-numeric: tabular-nums; overflow-x: auto; white-space: nowrap; }
+  .tbl-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+  th, td { padding: 6px 10px; border-bottom: 1px solid var(--rule); text-align: right; white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--muted); font-weight: 500; background: #f7fafb; position: sticky; top: 0; }
+  tr.best td { background: #fff4ec; font-weight: 600; }
+  .scroll { max-height: 360px; overflow: auto; }
+  .empty { text-align: center; padding: 60px 20px; color: var(--muted); }
+  .warn-box { background: #fdecea; color: var(--warn); border-radius: 6px; padding: 10px 12px; font-size: 14px; }
+  footer { text-align: center; font-size: 12.5px; color: var(--muted); padding: 0 20px 30px; }
+  @media (max-width: 1000px) { .grid2 { grid-template-columns: 1fr; } .metrics { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 800px) { .layout { grid-template-columns: 1fr; padding: 14px; } aside { position: static; } header { padding: 18px 16px; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>해양 관측 데이터 회귀분석</h1>
+  <p>데이터를 불러와 X·Y축을 고르면 선형회귀와 비선형회귀를 비교합니다. 회귀 알고리즘은 라이브러리 없이 직접 구현했습니다.</p>
+  <div class="dataset-line" id="datasetLine">데이터를 불러오는 중…</div>
+</header>
+
+<div class="layout">
+  <aside>
+    <section>
+      <h2>1. 데이터 불러오기</h2>
+      <label class="field" for="sampleSel">저장된 데이터</label>
+      <select id="sampleSel"></select>
+      <label class="field">또는 내 파일 열기</label>
+      <label class="file-btn">CSV · Excel 파일 선택<input type="file" id="fileIn" accept=".csv,.xlsx,.xls,.txt"></label>
+      <div id="loadErr" class="err" role="alert"></div>
+    </section>
+    <section>
+      <h2>2. 축 선택</h2>
+      <label class="field" for="xSel">X축 (입력 변수)</label>
+      <select id="xSel"></select>
+      <label class="field" for="ySel">Y축 (예측할 값)</label>
+      <select id="ySel"></select>
+    </section>
+    <section>
+      <h2>3. 데이터 정제</h2>
+      <label class="check"><input type="checkbox" id="dropNeg" checked> 0 이하 값 제거 (결측·장비 오류)</label>
+      <p class="note" id="countNote"></p>
+    </section>
+  </aside>
+
+  <main>
+    <nav class="tabs" role="tablist">
+      <button role="tab" aria-selected="true" data-tab="data">데이터</button>
+      <button role="tab" aria-selected="false" data-tab="lin">선형회귀</button>
+      <button role="tab" aria-selected="false" data-tab="poly">비선형회귀</button>
+      <button role="tab" aria-selected="false" data-tab="nn">인공신경망</button>
+    </nav>
+
+    <div id="emptyMsg" class="empty" hidden>왼쪽에서 데이터 파일을 선택하면 분석을 시작합니다.</div>
+
+    <!-- ===================== 데이터 탭 ===================== -->
+    <div class="panel active" id="panel-data">
+      <div class="grid2">
+        <div class="card">
+          <h3>데이터 미리보기</h3>
+          <p class="explain" id="previewInfo"></p>
+          <div class="tbl-wrap scroll"><table id="previewTbl"></table></div>
+        </div>
+        <div class="card">
+          <h3 id="scatterTitle">산점도</h3>
+          <div id="scatterChart" class="chart"></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>기초 통계</h3>
+        <div class="tbl-wrap"><table id="statsTbl"></table></div>
+      </div>
+    </div>
+
+    <!-- ===================== 선형회귀 탭 ===================== -->
+    <div class="panel" id="panel-lin">
+      <div class="card">
+        <h3>선형회귀: y = a·x + b</h3>
+        <p class="explain">잔차(실제값 − 예측값)의 제곱합이 가장 작아지는 a, b를 찾습니다. 경사하강법은 아무 값에서 출발해
+          손실의 기울기(미분값)가 내려가는 방향으로 조금씩 이동하기를 반복합니다. 결과를 최소제곱법 공식과 비교해 구현이 맞는지 확인합니다.</p>
+        <div class="controls">
+          <div class="ctl"><label for="lrSel">학습률 (한 번에 이동하는 거리)</label>
+            <select id="lrSel"><option>0.001</option><option>0.01</option><option>0.05</option><option selected>0.1</option><option>0.3</option><option>0.5</option><option>0.9</option><option>1.1</option></select></div>
+          <div class="ctl"><label for="iterIn">반복 횟수 <span class="val" id="iterVal">300</span></label>
+            <input type="range" id="iterIn" min="10" max="2000" step="10" value="300"></div>
+        </div>
+      </div>
+      <div id="divergeMsg" class="warn-box" hidden>학습률이 너무 커서 손실이 발산했습니다. 바닥을 지나쳐 반대편으로 튀기를 반복하며 점점 멀어지는 상태입니다. 학습률을 낮춰보세요.</div>
+      <div class="grid2">
+        <div class="card"><h3>회귀선이 맞춰지는 과정</h3><div id="gdChart" class="chart"></div></div>
+        <div class="card"><h3>반복에 따른 손실 감소</h3><div id="lossChart" class="chart"></div></div>
+      </div>
+      <div class="card">
+        <h3>결과 비교: 경사하강법 vs 최소제곱법 공식</h3>
+        <div class="tbl-wrap"><table id="linTbl"></table></div>
+        <p class="note">반복 횟수가 충분하면 두 방법의 a, b가 같아집니다. 학습률이 너무 작으면 바닥까지 못 가고, 너무 크면 발산합니다.</p>
+      </div>
+      <div class="card">
+        <h3>잔차 그래프</h3>
+        <p class="explain">잔차가 0 주변에 고르게 흩어지지 않고 휘어진 모양을 그리면 직선이 맞지 않는 데이터라는 뜻입니다. 이때 비선형회귀가 필요합니다.</p>
+        <div id="residChart" class="chart" style="height:320px"></div>
+      </div>
+    </div>
+
+    <!-- ===================== 비선형회귀 탭 ===================== -->
+    <div class="panel" id="panel-poly">
+      <div class="card">
+        <h3>비선형회귀</h3>
+        <p class="explain">다항 회귀는 테일러 급수처럼 x², x³ … 항을 더해 곡선으로 맞춥니다(1차면 선형회귀와 같음). 거듭제곱 모델 y = a·x<sup>b</sup>는
+          양변에 로그를 취하면 ln y = ln a + b·ln x 라는 직선이 되므로, 선형회귀와 같은 최소제곱법으로 풉니다.</p>
+        <div class="controls">
+          <div class="ctl"><label for="degIn">다항식 차수 <span class="val" id="degVal">2</span></label>
+            <input type="range" id="degIn" min="1" max="8" step="1" value="2"></div>
+          <div class="ctl"><label for="testIn">테스트 데이터 비율 <span class="val" id="testVal">20%</span></label>
+            <input type="range" id="testIn" min="0.1" max="0.4" step="0.05" value="0.2"></div>
+        </div>
+      </div>
+      <div class="metrics">
+        <div class="metric"><span>R² 선형</span><b id="mLin">-</b></div>
+        <div class="metric hl"><span id="mPolyLbl">R² 다항</span><b id="mPoly">-</b></div>
+        <div class="metric"><span>R² 거듭제곱</span><b id="mPow">-</b></div>
+        <div class="metric"><span id="mRmseLbl">RMSE 다항</span><b id="mRmse">-</b></div>
+      </div>
+      <div class="grid2">
+        <div class="card"><h3>모델 비교</h3><div id="polyChart" class="chart"></div></div>
+        <div class="card"><h3>차수별 성능 (과적합 확인)</h3><div id="degChart" class="chart"></div></div>
+      </div>
+      <div class="card">
+        <h3>회귀식</h3>
+        <div class="eq" id="polyEq"></div>
+        <div class="eq" id="powEq"></div>
+        <p class="explain" id="powNote"></p>
+        <div class="tbl-wrap"><table id="degTbl"></table></div>
+        <p class="note" id="degNote"></p>
+      </div>
+    </div>
+
+    <!-- ===================== 인공신경망 탭 ===================== -->
+    <div class="panel" id="panel-nn">
+      <div class="card">
+        <h3>인공신경망 (다음 과제에서 추가 예정)</h3>
+        <p class="explain">다항 회귀는 몇 차식을 쓸지 사람이 정해야 하고, 입력 변수도 하나뿐입니다. 인공신경망은 곡선의 모양을 데이터에서 스스로 학습하고,
+          풍속·풍향·파주기처럼 여러 변수를 함께 입력으로 쓸 수 있습니다. 다음 과제에서 이 탭에 구현합니다.</p>
+      </div>
+    </div>
+  </main>
+</div>
+<footer>데이터처리개론 과제 1 · 선형회귀와 비선형회귀 프로그래밍 실습</footer>
+
+<script>
+// ===================================================================
+// 회귀 알고리즘 (라이브러리 없이 직접 구현)
+//  - 최소제곱법: 잔차 제곱합을 미분해 0이 되는 a, b를 공식으로 계산
+//  - 경사하강법: 랜덤한 a, b에서 출발해 손실이 줄어드는 방향으로 반복 이동
+//  - 다항 회귀: y = c0 + c1 x + c2 x^2 + ... (테일러 급수처럼 고차항 추가)
+//  - 거듭제곱 모델: y = a x^b  → 양변 로그 → 직선 문제로 변환
+// ===================================================================
+const RG = (() => {
+  const mean = a => a.reduce((s, v) => s + v, 0) / a.length;
+  const std = a => { const m = mean(a); return Math.sqrt(mean(a.map(v => (v - m) ** 2))) || 1; };
+
+  function r2(y, p) {
+    const m = mean(y); let res = 0, tot = 0;
+    for (let i = 0; i < y.length; i++) { res += (y[i] - p[i]) ** 2; tot += (y[i] - m) ** 2; }
+    return tot > 0 ? 1 - res / tot : NaN;
+  }
+  function rmse(y, p) {
+    let s = 0; for (let i = 0; i < y.length; i++) s += (y[i] - p[i]) ** 2;
+    return Math.sqrt(s / y.length);
+  }
+
+  // ---------------- 선형회귀 ①: 최소제곱법 (정규방정식)
+  function leastSquares(x, y) {
+    const mx = mean(x), my = mean(y); let sxy = 0, sxx = 0;
+    for (let i = 0; i < x.length; i++) { sxy += (x[i] - mx) * (y[i] - my); sxx += (x[i] - mx) ** 2; }
+    const a = sxy / sxx;
+    return { a, b: my - a * mx };
+  }
+
+  // ---------------- 선형회귀 ②: 경사하강법
+  // x를 표준화(평균 0, 표준편차 1)해서 학습 → 발산을 막고, 끝나면 원래 단위로 되돌림
+  function gradientDescent(x, y, lr = 0.1, nIter = 300, seed = 7) {
+    const mu = mean(x), sg = std(x), n = x.length;
+    const xs = x.map(v => (v - mu) / sg);
+    const rnd = mulberry32(seed);
+    let w = (rnd() - 0.5) * 20, c = (rnd() - 0.5) * 20;   // 1) 아무 값에서 출발
+    const losses = [], snaps = [];
+    const snapAt = new Set([0, ...Array.from({ length: 8 }, (_, k) => Math.round(Math.exp(Math.log(nIter) * (k + 1) / 8)) - 1)]);
+    for (let it = 0; it < nIter; it++) {
+      let gw = 0, gc = 0, loss = 0;
+      for (let i = 0; i < n; i++) {
+        const r = w * xs[i] + c - y[i];        // 잔차 (예측 - 실제)
+        loss += r * r; gw += r * xs[i]; gc += r;
+      }
+      losses.push(loss / n);
+      if (snapAt.has(it)) snaps.push({ it, a: w / sg, b: c - w * mu / sg });
+      w -= lr * 2 * gw / n;                     // 2) 기울기(미분값) 반대 방향으로
+      c -= lr * 2 * gc / n;                     //    학습률만큼 이동
+      if (!isFinite(w) || !isFinite(c) || losses[it] > losses[0] * 1e6) break;  // 학습률이 너무 크면 발산
+    }
+    const diverged = !isFinite(w) || !isFinite(c) || losses[losses.length - 1] > losses[0];
+    return { a: w / sg, b: c - w * mu / sg, losses, snaps, diverged };
+  }
+
+  // ---------------- 비선형회귀: 다항 회귀
+  // 계수에 대해서는 선형이라 똑같이 잔차 제곱합 최소화(정규방정식)로 풀린다
+  function polyFit(x, y, deg) {
+    const mu = mean(x), sg = std(x), m = deg + 1;
+    const A = Array.from({ length: m }, () => new Float64Array(m)), B = new Float64Array(m);
+    for (let i = 0; i < x.length; i++) {
+      const z = (x[i] - mu) / sg, pw = [1];
+      for (let k = 1; k < 2 * m; k++) pw.push(pw[k - 1] * z);
+      for (let r = 0; r < m; r++) { B[r] += pw[r] * y[i]; for (let s = 0; s < m; s++) A[r][s] += pw[r + s]; }
+    }
+    const coefZ = solve(A, B);
+    const predict = v => { const z = (v - mu) / sg; let s = 0; for (let k = m - 1; k >= 0; k--) s = s * z + coefZ[k]; return s; };
+    // 원래 x 단위 계수로 변환: z = (x - mu)/sg 를 이항전개
+    const coef = new Array(m).fill(0);
+    for (let k = 0; k < m; k++) for (let j = 0; j <= k; j++)
+      coef[j] += coefZ[k] * binom(k, j) * (1 / sg) ** j * (-mu / sg) ** (k - j);
+    return { deg, predict, coef };
+  }
+
+  // ---------------- 비선형회귀: 거듭제곱 모델  ln y = ln a + b ln x
+  function powerFit(x, y) {
+    const lx = [], ly = [];
+    for (let i = 0; i < x.length; i++) if (x[i] > 0 && y[i] > 0) { lx.push(Math.log(x[i])); ly.push(Math.log(y[i])); }
+    if (lx.length < 2) return null;
+    const { a: b, b: lnA } = leastSquares(lx, ly);
+    return { a: Math.exp(lnA), b, n: lx.length, predict: v => v > 0 ? Math.exp(lnA) * v ** b : NaN };
+  }
+
+  function degreeTable(x, y, maxDeg = 8, testRatio = 0.2, seed = 42) {
+    const rnd = mulberry32(seed), idx = x.map((_, i) => i);
+    for (let i = idx.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [idx[i], idx[j]] = [idx[j], idx[i]]; }
+    const nt = Math.max(1, Math.floor(x.length * testRatio));
+    const te = idx.slice(0, nt), tr = idx.slice(nt);
+    const pick = (a, ii) => ii.map(i => a[i]);
+    const xtr = pick(x, tr), ytr = pick(y, tr), xte = pick(x, te), yte = pick(y, te);
+    const rows = [];
+    for (let d = 1; d <= maxDeg; d++) {
+      const m = polyFit(xtr, ytr, d);
+      const ptr = xtr.map(m.predict), pte = xte.map(m.predict);
+      rows.push({ deg: d, r2Train: r2(ytr, ptr), r2Test: r2(yte, pte), rmseTest: rmse(yte, pte) });
+    }
+    return rows;
+  }
+
+  function binMeans(x, y, nBins = 12, minCount = 10) {
+    let lo = Infinity, hi = -Infinity; for (const v of x) { if (v < lo) lo = v; if (v > hi) hi = v; }
+    const w = (hi - lo) / nBins || 1, sum = new Array(nBins).fill(0), cnt = new Array(nBins).fill(0);
+    for (let i = 0; i < x.length; i++) { const k = Math.min(nBins - 1, Math.floor((x[i] - lo) / w)); sum[k] += y[i]; cnt[k]++; }
+    const out = [];
+    for (let k = 0; k < nBins; k++) if (cnt[k] >= minCount) out.push({ x: lo + (k + 0.5) * w, y: sum[k] / cnt[k], n: cnt[k] });
+    return out;
+  }
+
+  // ---------------- 보조 함수
+  function solve(A, B) { // 가우스 소거법 (부분 피벗)
+    const n = B.length, M = A.map((r, i) => [...r, B[i]]);
+    for (let c = 0; c < n; c++) {
+      let p = c; for (let r = c + 1; r < n; r++) if (Math.abs(M[r][c]) > Math.abs(M[p][c])) p = r;
+      [M[c], M[p]] = [M[p], M[c]];
+      for (let r = c + 1; r < n; r++) { const f = M[r][c] / M[c][c]; for (let k = c; k <= n; k++) M[r][k] -= f * M[c][k]; }
+    }
+    const x = new Array(n).fill(0);
+    for (let r = n - 1; r >= 0; r--) { let s = M[r][n]; for (let k = r + 1; k < n; k++) s -= M[r][k] * x[k]; x[r] = s / M[r][r]; }
+    return x;
+  }
+  function binom(n, k) { let r = 1; for (let i = 1; i <= k; i++) r = r * (n - k + i) / i; return r; }
+  function mulberry32(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+  return { mean, r2, rmse, leastSquares, gradientDescent, polyFit, powerFit, degreeTable, binMeans };
+})();
+
+</script>
+<script>
+// ===================================================================
+// 화면(UI) 코드
+// ===================================================================
+// GitHub에 함께 올린 데이터 파일 목록. 파일을 추가하면 여기에 한 줄 추가하세요.
+const SAMPLES = [
+  { file: "geomundo_buoy.csv", label: "거문도 해양기상부이 1년 시간자료" },
+];
+
+const C = { sea: "#1d5c8a", signal: "#e2621b", teal: "#1f8a70", red: "#b42318", grey: "#8a99a6", ink: "#10263b" };
+const $ = id => document.getElementById(id);
+const state = { rows: [], cols: [], numCols: [], name: "", x: [], y: [], xName: "", yName: "" };
+
+// ---------------- 파일 읽기 (한글 CP949 인코딩 자동 처리)
+function decodeText(buf) {
+  try { return new TextDecoder("utf-8", { fatal: true }).decode(buf).replace(/^\uFEFF/, ""); }
+  catch { return new TextDecoder("euc-kr").decode(buf); }
+}
+function parseCSV(text) {
+  const lines = text.split(/\r?\n/).filter(l => l.trim() !== "");
+  const split = l => { const out = []; let cur = "", q = false;
+    for (const ch of l) { if (ch === '"') q = !q; else if (ch === "," && !q) { out.push(cur); cur = ""; } else cur += ch; }
+    out.push(cur); return out.map(s => s.trim()); };
+  const head = split(lines[0]);
+  return { cols: head, rows: lines.slice(1).map(l => { const c = split(l); const o = {}; head.forEach((h, i) => o[h] = c[i] ?? ""); return o; }) };
+}
+function parseTable(name, buf) {
+  if (/\.xlsx?$/i.test(name)) {
+    const wb = XLSX.read(buf, { type: "array" });
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: "" });
+    return { cols: rows.length ? Object.keys(rows[0]) : [], rows };
+  }
+  return parseCSV(decodeText(buf));
+}
+function loadData(name, buf) {
+  try {
+    const t = parseTable(name, buf);
+    if (!t.rows.length) throw new Error("데이터 행이 없습니다");
+    state.rows = t.rows; state.cols = t.cols; state.name = name;
+    state.numCols = t.cols.filter(c => {
+      let n = 0, ok = 0; for (const r of t.rows) { const v = r[c]; if (v === "" || v == null) continue; n++; if (isFinite(Number(v))) ok++; }
+      return n > 0 && ok / n > 0.95;
+    });
+    if (state.numCols.length < 2) throw new Error("숫자로 된 열이 2개 이상 있어야 합니다");
+    $("loadErr").textContent = "";
+    fillAxes(); refresh();
+  } catch (e) {
+    $("loadErr").textContent = "파일을 읽지 못했습니다: " + e.message + ". 첫 줄이 열 이름인 CSV 또는 Excel인지 확인하세요.";
+  }
+}
+function fillAxes() {
+  const find = (kws, fb) => { for (const k of kws) { const c = state.numCols.find(c => c.includes(k) && !/GUST/i.test(c)); if (c) return c; } return state.numCols[fb]; };
+  for (const [sel, def] of [[$("xSel"), find(["풍속"], 0)], [$("ySel"), find(["유의파고"], 1)]]) {
+    sel.innerHTML = state.numCols.map(c => `<option${c === def ? " selected" : ""}>${esc(c)}</option>`).join("");
+  }
+}
+const esc = s => String(s).replace(/[&<>"]/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch]));
+const fmt = (v, d = 4) => isFinite(v) ? Number(v).toFixed(d) : "-";
+
+// ---------------- 분석 데이터 준비
+function refresh() {
+  const xn = $("xSel").value, yn = $("ySel").value;
+  state.xName = xn; state.yName = yn;
+  const x = [], y = []; let raw = 0;
+  for (const r of state.rows) {
+    const a = Number(r[xn]), b = Number(r[yn]);
+    if (r[xn] === "" || r[yn] === "" || !isFinite(a) || !isFinite(b)) continue;
+    raw++;
+    if ($("dropNeg").checked && (a <= 0 || b <= 0)) continue;
+    x.push(a); y.push(b);
+  }
+  state.x = x; state.y = y;
+  $("countNote").textContent = `분석에 사용하는 데이터 ${x.length.toLocaleString()}개 (제외 ${(state.rows.length - x.length).toLocaleString()}개)`;
+  const period = state.cols.includes("일시") ? ` · ${state.rows[0]["일시"]} ~ ${state.rows[state.rows.length - 1]["일시"]}` : "";
+  $("datasetLine").textContent = `${state.name} · ${state.rows.length.toLocaleString()}행${period}`;
+  const ok = xn !== yn && x.length >= 5;
+  $("emptyMsg").hidden = ok;
+  if (!ok) { $("emptyMsg").textContent = xn === yn ? "X축과 Y축에 서로 다른 열을 골라주세요." : "분석할 수 있는 데이터가 너무 적습니다."; return; }
+  renderData(); renderLinear(); renderPoly();
+}
+
+// ---------------- 공통 그래프 설정
+const baseLayout = (xt, yt, extra = {}) => ({
+  font: { family: "IBM Plex Sans KR, Malgun Gothic, sans-serif", size: 12, color: C.ink },
+  margin: { l: 56, r: 12, t: 10, b: 48 }, paper_bgcolor: "#fff", plot_bgcolor: "#fff",
+  xaxis: { title: { text: xt }, gridcolor: "#e6ecef", zeroline: false },
+  yaxis: { title: { text: yt }, gridcolor: "#e6ecef", zeroline: false },
+  legend: { orientation: "h", y: 1.08, x: 0 }, ...extra,
+});
+const cfg = { responsive: true, displaylogo: false, modeBarButtonsToRemove: ["lasso2d", "select2d"] };
+const pointsTrace = () => ({ x: state.x, y: state.y, type: "scattergl", mode: "markers", name: "관측값",
+  marker: { color: C.sea, size: state.x.length > 2000 ? 4 : 7, opacity: state.x.length > 2000 ? 0.28 : 0.6 } });
+const grid = () => { let lo = Math.min(...state.x), hi = Math.max(...state.x); return Array.from({ length: 200 }, (_, i) => lo + (hi - lo) * i / 199); };
+
+// ---------------- 데이터 탭
+function renderData() {
+  const cols = state.cols, show = state.rows.slice(0, 50);
+  $("previewInfo").textContent = `${state.rows.length.toLocaleString()}행 × ${cols.length}열 (처음 50행 표시)`;
+  $("previewTbl").innerHTML = `<thead><tr>${cols.map(c => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>` +
+    show.map(r => `<tr>${cols.map(c => `<td>${esc(r[c])}</td>`).join("")}</tr>`).join("") + "</tbody>";
+  const st = state.numCols.map(c => {
+    const v = state.rows.map(r => r[c]).filter(s => s !== "" && s != null).map(Number).filter(isFinite);
+    const m = RG.mean(v), sd = Math.sqrt(RG.mean(v.map(a => (a - m) ** 2)));
+    return [c, v.length, m, sd, Math.min(...v), Math.max(...v), state.rows.length - v.length];
+  });
+  $("statsTbl").innerHTML = "<thead><tr><th>열</th><th>개수</th><th>평균</th><th>표준편차</th><th>최솟값</th><th>최댓값</th><th>결측</th></tr></thead><tbody>" +
+    st.map(r => `<tr><td>${esc(r[0])}</td><td>${r[1].toLocaleString()}</td>${r.slice(2, 6).map(v => `<td>${fmt(v, 2)}</td>`).join("")}<td>${r[6]}</td></tr>`).join("") + "</tbody>";
+  $("scatterTitle").textContent = `${state.xName} vs ${state.yName}`;
+  Plotly.react("scatterChart", [pointsTrace()], baseLayout(state.xName, state.yName, { showlegend: false }), cfg);
+}
+
+// ---------------- 선형회귀 탭
+function renderLinear() {
+  const { x, y } = state, lr = Number($("lrSel").value), it = Number($("iterIn").value);
+  $("iterVal").textContent = it;
+  const gd = RG.gradientDescent(x, y, lr, it), ls = RG.leastSquares(x, y), g = grid();
+  $("divergeMsg").hidden = !gd.diverged;
+  const snaps = gd.snaps.filter(s => isFinite(s.a) && isFinite(s.b)).map((s, i, arr) => ({
+    x: g, y: g.map(v => s.a * v + s.b), mode: "lines", name: `${s.it + 1}회`, showlegend: false, hoverinfo: "name",
+    line: { color: C.grey, width: 1, dash: "dot" }, opacity: 0.25 + 0.55 * i / Math.max(1, arr.length - 1) }));
+  const traces = [pointsTrace(), ...snaps];
+  if (!gd.diverged) traces.push({ x: g, y: g.map(v => gd.a * v + gd.b), mode: "lines", name: "경사하강법 최종 회귀선", line: { color: C.signal, width: 3 } });
+  const yr = [Math.min(...y), Math.max(...y)], pad = (yr[1] - yr[0]) * 0.15;
+  Plotly.react("gdChart", traces, baseLayout(state.xName, state.yName, { yaxis: { title: { text: state.yName }, range: [yr[0] - pad, yr[1] + pad], gridcolor: "#e6ecef" } }), cfg);
+  Plotly.react("lossChart", [{ y: gd.losses, mode: "lines", line: { color: C.sea, width: 2 }, name: "손실" }],
+    baseLayout("반복 횟수", "손실 (평균 잔차 제곱, 로그 눈금)", { yaxis: { type: "log", title: { text: "손실 (평균 잔차 제곱, 로그 눈금)" }, gridcolor: "#e6ecef" }, showlegend: false }), cfg);
+  const row = (n, a, b) => { const p = x.map(v => a * v + b); return `<tr><td>${n}</td><td>${fmt(a, 5)}</td><td>${fmt(b, 5)}</td><td>${fmt(RG.r2(y, p))}</td><td>${fmt(RG.rmse(y, p))}</td></tr>`; };
+  $("linTbl").innerHTML = "<thead><tr><th>방법</th><th>기울기 a</th><th>절편 b</th><th>R²</th><th>RMSE</th></tr></thead><tbody>" +
+    (gd.diverged ? `<tr><td>경사하강법 (${it}회 반복)</td><td colspan="4" style="text-align:left;color:${C.red}">발산</td></tr>` : row(`경사하강법 (${it}회 반복)`, gd.a, gd.b)) +
+    row("최소제곱법 (정규방정식)", ls.a, ls.b) + "</tbody>";
+  const res = x.map((v, i) => y[i] - (ls.a * v + ls.b));
+  Plotly.react("residChart", [{ x, y: res, type: "scattergl", mode: "markers", marker: { color: C.sea, size: 4, opacity: 0.35 }, name: "잔차" }],
+    baseLayout(state.xName, "잔차 (실제 − 예측)", { showlegend: false, shapes: [{ type: "line", xref: "paper", x0: 0, x1: 1, y0: 0, y1: 0, line: { color: C.signal, width: 2 } }] }), cfg);
+}
+
+// ---------------- 비선형회귀 탭
+function polyText(coef, v = "x") {
+  return "y = " + coef.map((c, k) => {
+    const s = k === 0 ? fmtSig(c) : (c < 0 ? " − " : " + ") + fmtSig(Math.abs(c));
+    return s + (k === 0 ? "" : k === 1 ? `·${v}` : `·${v}<sup>${k}</sup>`);
+  }).join("");
+}
+const fmtSig = v => Math.abs(v) >= 1e-3 && Math.abs(v) < 1e4 ? Number(v.toPrecision(4)).toString() : v.toExponential(3);
+
+function renderPoly() {
+  const { x, y } = state, d = Number($("degIn").value), tr = Number($("testIn").value), g = grid();
+  $("degVal").textContent = d; $("testVal").textContent = Math.round(tr * 100) + "%";
+  const ls = RG.leastSquares(x, y), pm = RG.polyFit(x, y, d), pw = RG.powerFit(x, y), bins = RG.binMeans(x, y);
+  const pPoly = x.map(pm.predict);
+  $("mLin").textContent = fmt(RG.r2(y, x.map(v => ls.a * v + ls.b)));
+  $("mPolyLbl").textContent = `R² ${d}차 다항`; $("mPoly").textContent = fmt(RG.r2(y, pPoly));
+  $("mPow").textContent = pw ? fmt(RG.r2(y, x.map(pw.predict))) : "-";
+  $("mRmseLbl").textContent = `RMSE ${d}차 다항`; $("mRmse").textContent = fmt(RG.rmse(y, pPoly));
+
+  const traces = [pointsTrace(),
+    { x: g, y: g.map(v => ls.a * v + ls.b), mode: "lines", name: "선형", line: { color: C.grey, width: 2, dash: "dash" } }];
+  if (pw) { const gp = g.filter(v => v > 0); traces.push({ x: gp, y: gp.map(pw.predict), mode: "lines", name: "거듭제곱 a·xᵇ", line: { color: C.teal, width: 2 } }); }
+  traces.push({ x: g, y: g.map(pm.predict), mode: "lines", name: `${d}차 다항`, line: { color: C.signal, width: 3 } });
+  traces.push({ x: bins.map(b => b.x), y: bins.map(b => b.y), mode: "markers", name: "구간별 평균",
+    marker: { color: C.red, size: 11, symbol: "diamond", line: { color: "#fff", width: 1 } },
+    text: bins.map(b => `${b.n}개`), hovertemplate: "구간 중앙 %{x:.2f}<br>평균 %{y:.3f}<br>%{text}<extra></extra>" });
+  const yr = [Math.min(...y), Math.max(...y)], pad = (yr[1] - yr[0]) * 0.1;
+  Plotly.react("polyChart", traces, baseLayout(state.xName, state.yName, { yaxis: { title: { text: state.yName }, range: [yr[0] - pad, yr[1] + pad], gridcolor: "#e6ecef" } }), cfg);
+
+  const tbl = RG.degreeTable(x, y, 8, tr);
+  // 테스트 R²가 최고값과 0.005 이내로 비슷하면 더 단순한(낮은 차수) 모델을 고른다
+  const top = Math.max(...tbl.map(r => r.r2Test)), best = tbl.find(r => r.r2Test >= top - 0.005);
+  Plotly.react("degChart", [
+    { x: tbl.map(r => r.deg), y: tbl.map(r => r.r2Train), mode: "lines+markers", name: "학습 R²", line: { color: C.sea } },
+    { x: tbl.map(r => r.deg), y: tbl.map(r => r.r2Test), mode: "lines+markers", name: "테스트 R²", line: { color: C.signal } },
+  ], baseLayout("다항식 차수", "R²", { xaxis: { title: { text: "다항식 차수" }, dtick: 1, gridcolor: "#e6ecef" } }), cfg);
+  $("degTbl").innerHTML = "<thead><tr><th>차수</th><th>학습 R²</th><th>테스트 R²</th><th>테스트 RMSE</th></tr></thead><tbody>" +
+    tbl.map(r => `<tr class="${r.deg === best.deg ? "best" : ""}"><td>${r.deg}차</td><td>${fmt(r.r2Train)}</td><td>${fmt(r.r2Test)}</td><td>${fmt(r.rmseTest)}</td></tr>`).join("") + "</tbody>";
+  $("degNote").textContent = `추천 차수는 ${best.deg}차입니다 (테스트 R²가 최고값과 0.005 이내로 비슷하면 더 단순한 모델을 고름). 학습 R²는 차수를 올릴수록 계속 좋아지지만, 처음 보는 테스트 데이터의 R²가 떨어지기 시작하면 잡음까지 외운 과적합입니다.`;
+
+  $("polyEq").innerHTML = `<b>${d}차 다항</b>&nbsp;&nbsp;` + polyText(pm.coef);
+  if (pw) {
+    $("powEq").innerHTML = `<b>거듭제곱</b>&nbsp;&nbsp;y = ${fmtSig(pw.a)}·x<sup>${pw.b.toFixed(3)}</sup>`;
+    $("powNote").textContent = `지수 b = ${pw.b.toFixed(2)}. 파랑 이론에서 충분히 발달한 풍파의 유의파고는 풍속의 제곱(b≈2)에 비례합니다. ` +
+      "거듭제곱 모델은 풍속이 0이면 파고도 0이라고 가정하지만, 실제 바다에는 바람이 없어도 먼 곳에서 온 너울이 있어서 이 가정이 맞지 않으면 지수가 작게 나오고 R²도 낮아집니다. " +
+      "이럴 때는 '기본 파고 + 풍속² 항' 형태인 2차 다항식이 더 잘 맞습니다.";
+  } else { $("powEq").textContent = "거듭제곱 모델: 0보다 큰 값이 부족해 계산할 수 없습니다."; $("powNote").textContent = ""; }
+}
+
+// ---------------- 이벤트 연결
+document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click", () => {
+  document.querySelectorAll(".tabs button").forEach(o => o.setAttribute("aria-selected", o === b));
+  document.querySelectorAll(".panel").forEach(p => p.classList.toggle("active", p.id === "panel-" + b.dataset.tab));
+  window.dispatchEvent(new Event("resize")); // 숨겨져 있던 그래프 크기 다시 맞추기
+}));
+["xSel", "ySel", "dropNeg"].forEach(id => $(id).addEventListener("change", refresh));
+$("lrSel").addEventListener("change", () => state.x.length && renderLinear());
+$("iterIn").addEventListener("input", () => state.x.length && renderLinear());
+$("degIn").addEventListener("input", () => state.x.length && renderPoly());
+$("testIn").addEventListener("input", () => state.x.length && renderPoly());
+$("fileIn").addEventListener("change", async e => {
+  const f = e.target.files[0]; if (!f) return;
+  $("sampleSel").value = "";
+  loadData(f.name, await f.arrayBuffer());
+});
+$("sampleSel").innerHTML = `<option value="">— 선택 —</option>` + SAMPLES.map(s => `<option value="${esc(s.file)}">${esc(s.label)}</option>`).join("");
+$("sampleSel").addEventListener("change", e => e.target.value && loadSample(e.target.value));
+
+async function loadSample(file) {
+  try {
+    const r = await fetch(file); if (!r.ok) throw new Error(r.status);
+    loadData(file, await r.arrayBuffer());
+  } catch {
+    $("loadErr").textContent = "저장된 데이터를 불러오지 못했습니다. 컴퓨터에서 이 파일을 바로 열면 보안 제한으로 막힐 수 있으니, '내 파일 열기'로 CSV를 선택하세요. (GitHub Pages 주소에서는 정상 작동합니다)";
+    $("datasetLine").textContent = "데이터를 선택해 주세요";
+    $("emptyMsg").hidden = false;
+  }
+}
+if (SAMPLES.length) { $("sampleSel").value = SAMPLES[0].file; loadSample(SAMPLES[0].file); }
+</script>
+</body>
+</html>
