@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>해양 관측 데이터 회귀분석</title>
+<title>해양 관측 데이터 회귀분석 · 인공신경망</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -66,14 +66,37 @@
   .empty { text-align: center; padding: 60px 20px; color: var(--muted); }
   .warn-box { background: #fdecea; color: var(--warn); border-radius: 6px; padding: 10px 12px; font-size: 14px; }
   footer { text-align: center; font-size: 12.5px; color: var(--muted); padding: 0 20px 30px; }
+  /* ---------- 인공신경망 탭 ---------- */
+  .nn-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 22px; }
+  fieldset.inputs { border: 1px solid var(--rule); border-radius: 8px; padding: 8px 12px 10px; margin: 0; }
+  fieldset.inputs legend { font-size: 13px; color: var(--muted); padding: 0 4px; }
+  .inp { display: flex; gap: 8px; align-items: flex-start; font-size: 14px; padding: 3px 0; }
+  .inp small { color: var(--muted); font-size: 12px; display: block; line-height: 1.35; }
+  .inp.leak small { color: var(--warn); }
+  .nn-ctl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; align-content: start; }
+  .nn-ctl label { font-size: 13px; color: var(--muted); display: block; margin-bottom: 4px; }
+  .nn-ctl input[type=range] { width: 100%; }
+  .run-row { grid-column: 1 / -1; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-top: 4px; }
+  .btn { font: inherit; font-size: 15px; font-weight: 600; border: none; border-radius: 8px; padding: 9px 20px; cursor: pointer; background: var(--signal); color: #fff; }
+  .btn:hover { filter: brightness(0.95); }
+  .btn.stop { background: var(--ink); }
+  .btn.ghost { background: none; color: var(--sea); border: 1px solid var(--rule); font-weight: 500; font-size: 13px; padding: 5px 12px; }
+  .status { font-size: 13.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .progress { height: 4px; background: var(--rule); border-radius: 2px; overflow: hidden; grid-column: 1 / -1; }
+  .progress i { display: block; height: 100%; width: 0; background: var(--signal); transition: width .15s; }
+  #nnNet { width: 100%; height: 420px; }
+  #nnNet svg { width: 100%; height: 100%; }
+  .legend-line { font-size: 12.5px; color: var(--muted); margin-top: 6px; }
+  .legend-line b { display: inline-block; width: 18px; height: 3px; vertical-align: middle; margin: 0 4px 0 10px; }
+  @media (max-width: 1000px) { .nn-grid { grid-template-columns: 1fr; } }
   @media (max-width: 1000px) { .grid2 { grid-template-columns: 1fr; } .metrics { grid-template-columns: repeat(2, 1fr); } }
   @media (max-width: 800px) { .layout { grid-template-columns: 1fr; padding: 14px; } aside { position: static; } header { padding: 18px 16px; } }
 </style>
 </head>
 <body>
 <header>
-  <h1>해양 관측 데이터 회귀분석</h1>
-  <p>데이터를 불러와 X·Y축을 고르면 선형회귀와 비선형회귀를 비교합니다. 회귀 알고리즘은 라이브러리 없이 직접 구현했습니다.</p>
+  <h1>해양 관측 데이터 회귀분석 · 인공신경망</h1>
+  <p>데이터를 불러와 X·Y축을 고르면 선형회귀, 비선형회귀, 인공신경망을 비교합니다. 모든 알고리즘은 라이브러리 없이 직접 구현했습니다.</p>
   <div class="dataset-line" id="datasetLine">데이터를 불러오는 중…</div>
 </header>
 
@@ -98,6 +121,10 @@
       <h2>3. 데이터 정제</h2>
       <label class="check"><input type="checkbox" id="dropNeg" checked> 0 이하 값 제거 (결측·장비 오류)</label>
       <p class="note" id="countNote"></p>
+    </section>
+    <section>
+      <h2>인공신경망 탭</h2>
+      <p class="note">Y축으로 고른 열을 예측합니다. 입력 변수는 탭 안에서 여러 개를 고를 수 있습니다.</p>
     </section>
   </aside>
 
@@ -196,14 +223,72 @@
     <!-- ===================== 인공신경망 탭 ===================== -->
     <div class="panel" id="panel-nn">
       <div class="card">
-        <h3>인공신경망 (다음 과제에서 추가 예정)</h3>
-        <p class="explain">다항 회귀는 몇 차식을 쓸지 사람이 정해야 하고, 입력 변수도 하나뿐입니다. 인공신경망은 곡선의 모양을 데이터에서 스스로 학습하고,
-          풍속·풍향·파주기처럼 여러 변수를 함께 입력으로 쓸 수 있습니다. 다음 과제에서 이 탭에 구현합니다.</p>
+        <h3 id="nnTitle">인공신경망: 여러 변수로 예측하기</h3>
+        <p class="explain">다항 회귀는 몇 차식을 쓸지 사람이 정해야 하고 입력 변수도 하나뿐이었습니다. 인공신경망은 여러 입력을 받아
+          <b>가중합 → 활성화 함수</b>를 여러 층 거치면서 곡선의 모양을 데이터에서 스스로 학습합니다. 학습은 과제 1의 경사하강법과 같은 원리로,
+          역전파로 모든 가중치의 기울기를 구한 뒤 손실이 줄어드는 방향으로 조금씩 이동합니다.</p>
+        <div class="nn-grid">
+          <fieldset class="inputs"><legend>입력 변수 (여러 개 선택)</legend><div id="nnInputs"></div></fieldset>
+          <div class="nn-ctl">
+            <div><label for="nnArch">은닉층 구조 (뉴런 수)</label>
+              <select id="nnArch"><option value="8">1층: 8</option><option value="16">1층: 16</option><option value="16,16" selected>2층: 16 - 16</option><option value="32,16">2층: 32 - 16</option><option value="32,32,16">3층: 32 - 32 - 16</option></select></div>
+            <div><label for="nnAct">활성화 함수</label>
+              <select id="nnAct"><option value="tanh" selected>tanh</option><option value="relu">ReLU</option><option value="sigmoid">sigmoid</option></select></div>
+            <div><label for="nnOpt">학습 방법</label>
+              <select id="nnOpt"><option value="sgd" selected>미니배치 경사하강법</option><option value="adam">Adam (보폭 자동 조절)</option></select></div>
+            <div><label for="nnLr">학습률</label>
+              <select id="nnLr"><option>0.0003</option><option>0.001</option><option>0.003</option><option>0.01</option><option>0.03</option><option selected>0.1</option><option>0.3</option><option>1</option></select></div>
+            <div><label for="nnEp">에포크 (전체 데이터 학습 횟수) <span class="val" id="nnEpVal">80</span></label>
+              <input type="range" id="nnEp" min="10" max="300" step="10" value="80"></div>
+            <div><label for="nnSplit">학습 / 검증 / 테스트 나누기 (70 / 15 / 15%)</label>
+              <select id="nnSplit"><option value="day" selected>하루 단위로 묶어서 (권장)</option><option value="hour">1시간 단위 무작위</option></select></div>
+            <div class="run-row">
+              <button class="btn" id="nnRun">학습 시작</button>
+              <span class="status" id="nnStatus" aria-live="polite"></span>
+            </div>
+            <div class="progress"><i id="nnProg"></i></div>
+          </div>
+        </div>
+      </div>
+      <div id="nnDiverge" class="warn-box" hidden>학습률이 너무 커서 손실이 발산했습니다. 가중치가 바닥을 지나쳐 점점 멀어지는 상태입니다. 학습률을 낮춰보세요.</div>
+      <div class="metrics">
+        <div class="metric hl"><span>테스트 R² 신경망</span><b id="nnR2">-</b></div>
+        <div class="metric"><span id="nnBaseLbl">테스트 R² 2차 다항</span><b id="nnR2Poly">-</b></div>
+        <div class="metric"><span>테스트 RMSE 신경망</span><b id="nnRmse">-</b></div>
+        <div class="metric"><span>가장 좋았던 에포크</span><b id="nnBest">-</b></div>
+      </div>
+      <div class="grid2">
+        <div class="card"><h3>에포크에 따른 손실 (학습 vs 검증)</h3>
+          <p class="explain">학습 손실은 계속 줄어도 처음 보는 검증 데이터의 손실이 다시 오르기 시작하면 과적합입니다. 검증 손실이 가장 낮았던 시점의 가중치를 최종 모델로 씁니다.</p>
+          <div id="nnLossChart" class="chart" style="height:360px"></div></div>
+        <div class="card"><h3>신경망 구조와 학습된 가중치</h3>
+          <p class="explain">원은 뉴런, 선은 가중치입니다. 선이 굵을수록 가중치의 크기가 큽니다.</p>
+          <div id="nnNet"></div>
+          <div class="legend-line"><b style="background:#e2621b"></b>양(+)의 가중치 <b style="background:#1d5c8a"></b>음(−)의 가중치</div></div>
+      </div>
+      <div class="grid2">
+        <div class="card"><h3>예측값 vs 실제값 (테스트 데이터)</h3>
+          <p class="explain">점이 대각선(예측 = 실제)에 가까이 모일수록 잘 맞춘 것입니다.</p>
+          <div id="nnScatter" class="chart"></div></div>
+        <div class="card"><h3>입력 변수 중요도</h3>
+          <p class="explain">테스트 데이터에서 한 변수의 값만 무작위로 섞었을 때 R²가 얼마나 떨어지는지 봅니다. 많이 떨어질수록 신경망이 그 변수에 크게 의존한다는 뜻입니다.</p>
+          <div id="nnImpChart" class="chart"></div></div>
+      </div>
+      <div class="card" id="nnCurveCard" hidden><h3>신경망이 스스로 찾은 곡선</h3>
+        <p class="explain">입력이 하나일 때는 신경망이 학습한 함수를 곡선으로 그릴 수 있습니다. 차수를 정해주지 않았는데도 2차 다항식과 비슷한 모양을 스스로 찾았는지 비교합니다.</p>
+        <div id="nnCurveChart" class="chart"></div></div>
+      <div class="card" id="nnTsCard"><h3>시간에 따른 예측 비교</h3>
+        <p class="explain" id="nnTsNote">처음에는 1년 중 바람이 가장 강했던 때 앞뒤 열흘을 보여줍니다. 그래프를 드래그하면 다른 기간도 볼 수 있습니다.</p>
+        <div id="nnTsChart" class="chart"></div></div>
+      <div class="card"><h3>실험 기록</h3>
+        <p class="explain">학습을 마칠 때마다 한 줄씩 추가됩니다. 입력 변수나 구조를 바꿔가며 어떤 조합이 좋은지 비교해 보세요.</p>
+        <div class="tbl-wrap"><table id="nnLog"></table></div>
+        <p style="margin:10px 0 0"><button class="btn ghost" id="nnLogClear">기록 지우기</button></p>
       </div>
     </div>
   </main>
 </div>
-<footer>데이터처리개론 과제 1 · 선형회귀와 비선형회귀 프로그래밍 실습</footer>
+<footer>데이터처리개론 과제 1 · 선형회귀와 비선형회귀 / 과제 2 · 인공신경망을 이용한 데이터 예측</footer>
 
 <script>
 // ===================================================================
@@ -334,6 +419,135 @@ const RG = (() => {
 </script>
 <script>
 // ===================================================================
+// 인공신경망 (다층 퍼셉트론) — 라이브러리 없이 직접 구현
+//  - 순전파: 입력 → (가중합 + 편향 → 활성화 함수) × 은닉층 → 출력
+//  - 손실: 평균 제곱 오차 (과제 1의 잔차 제곱과 같음)
+//  - 역전파: 연쇄법칙으로 모든 가중치에 대한 손실의 기울기 계산
+//  - 학습: 미니배치 경사하강법 (Adam: 기울기의 이동 평균으로 보폭 자동 조절)
+// ===================================================================
+const NN = (() => {
+  function mulberry32(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  function gauss(rnd) { let u = 0, v = 0; while (u === 0) u = rnd(); while (v === 0) v = rnd(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+
+  const ACT = {
+    tanh: { f: z => Math.tanh(z), d: (z, a) => 1 - a * a },
+    relu: { f: z => z > 0 ? z : 0, d: (z, a) => z > 0 ? 1 : 0 },
+    sigmoid: { f: z => 1 / (1 + Math.exp(-z)), d: (z, a) => a * (1 - a) },
+  };
+
+  // sizes = [입력 수, 은닉1, 은닉2, ..., 1]
+  function create(sizes, act = "tanh", seed = 1) {
+    const rnd = mulberry32(seed), layers = [];
+    for (let l = 0; l < sizes.length - 1; l++) {
+      const nIn = sizes[l], nOut = sizes[l + 1];
+      // 가중치 초기화: 층이 깊어져도 신호 크기가 유지되도록 √(1/입력수) 또는 √(2/입력수) 크기로 랜덤
+      const scale = act === "relu" ? Math.sqrt(2 / nIn) : Math.sqrt(1 / nIn);
+      const W = Array.from({ length: nOut }, () => Float64Array.from({ length: nIn }, () => gauss(rnd) * scale));
+      layers.push({ nIn, nOut, W, b: new Float64Array(nOut) });
+    }
+    return { sizes, act, layers };
+  }
+
+  // 순전파: 각 층의 z(가중합)와 a(활성화 출력)를 저장 → 역전파에서 사용
+  function forward(net, x) {
+    const zs = [], as = [x];
+    let a = x;
+    net.layers.forEach((L, l) => {
+      const last = l === net.layers.length - 1;
+      const z = new Float64Array(L.nOut), out = new Float64Array(L.nOut);
+      for (let j = 0; j < L.nOut; j++) {
+        let s = L.b[j]; const w = L.W[j];
+        for (let i = 0; i < L.nIn; i++) s += w[i] * a[i];
+        z[j] = s; out[j] = last ? s : ACT[net.act].f(s);   // 출력층은 활성화 없이 그대로(회귀)
+      }
+      zs.push(z); as.push(out); a = out;
+    });
+    return { zs, as, y: a[0] };
+  }
+  const predict = (net, x) => forward(net, x).y;
+
+  // 역전파: 출력의 오차를 뒤에서 앞으로 전달하며 각 가중치의 기울기(∂L/∂w)를 누적
+  function backward(net, fw, target, gW, gb) {
+    const nL = net.layers.length;
+    let delta = new Float64Array([2 * (fw.y - target)]);   // ∂L/∂ŷ  (L = (ŷ - y)²)
+    for (let l = nL - 1; l >= 0; l--) {
+      const L = net.layers[l], aPrev = fw.as[l];
+      for (let j = 0; j < L.nOut; j++) {
+        gb[l][j] += delta[j];
+        const g = gW[l][j];
+        for (let i = 0; i < L.nIn; i++) g[i] += delta[j] * aPrev[i];   // ∂L/∂w = δ × 앞 층 출력
+      }
+      if (l > 0) {   // δ를 앞 층으로: δ_prev = (Wᵀ δ) × 활성화 함수의 미분
+        const nd = new Float64Array(L.nIn), zP = fw.zs[l - 1], aP = fw.as[l];
+        for (let i = 0; i < L.nIn; i++) {
+          let s = 0; for (let j = 0; j < L.nOut; j++) s += L.W[j][i] * delta[j];
+          nd[i] = s * ACT[net.act].d(zP[i], aP[i]);
+        }
+        delta = nd;
+      }
+    }
+  }
+
+  const zerosLike = net => ({
+    W: net.layers.map(L => L.W.map(r => new Float64Array(r.length))),
+    b: net.layers.map(L => new Float64Array(L.nOut)),
+  });
+
+  // 학습기: epoch()를 부를 때마다 1 에포크(학습 데이터 전체를 한 번) 학습
+  //  - 미니배치: 데이터를 섞은 뒤 batch개씩 묶어 기울기를 평균 내고 그때마다 가중치를 한 번 이동
+  function trainer(net, X, Y, opt = {}) {
+    const { lr = 0.1, batch = 64, optimizer = "sgd", seed = 3 } = opt;
+    const rnd = mulberry32(seed), n = X.length, idx = Array.from({ length: n }, (_, i) => i);
+    const g = zerosLike(net), m = zerosLike(net), v = zerosLike(net);
+    const b1 = 0.9, b2 = 0.999, eps = 1e-8; let t = 0;
+    function update(bs) {
+      t++;
+      net.layers.forEach((L, l) => {
+        const upd = (P, G, M, V, k) => {
+          const grad = G[k] / bs;                      // 미니배치 평균 기울기
+          if (optimizer === "adam") {
+            M[k] = b1 * M[k] + (1 - b1) * grad;          // 기울기의 평균 (방향)
+            V[k] = b2 * V[k] + (1 - b2) * grad * grad;   // 기울기 제곱의 평균 (크기)
+            const mh = M[k] / (1 - b1 ** t), vh = V[k] / (1 - b2 ** t);
+            P[k] -= lr * mh / (Math.sqrt(vh) + eps);
+          } else {
+            P[k] -= lr * grad;                           // 과제 1과 같은 기본 경사하강법
+          }
+          G[k] = 0;
+        };
+        for (let j = 0; j < L.nOut; j++) {
+          for (let i = 0; i < L.nIn; i++) upd(L.W[j], g.W[l][j], m.W[l][j], v.W[l][j], i);
+          upd(L.b, g.b[l], m.b[l], v.b[l], j);
+        }
+      });
+    }
+    return {
+      epoch() {
+        for (let i = n - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [idx[i], idx[j]] = [idx[j], idx[i]]; }
+        let loss = 0;
+        for (let s = 0; s < n; s += batch) {
+          const e = Math.min(n, s + batch);
+          for (let k = s; k < e; k++) {
+            const fw = forward(net, X[idx[k]]);
+            loss += (fw.y - Y[idx[k]]) ** 2;
+            backward(net, fw, Y[idx[k]], g.W, g.b);
+          }
+          update(e - s);
+        }
+        return loss / n;
+      },
+    };
+  }
+
+  const mse = (net, X, Y) => { let s = 0; for (let i = 0; i < X.length; i++) s += (predict(net, X[i]) - Y[i]) ** 2; return s / X.length; };
+  const clone = net => ({ ...net, layers: net.layers.map(L => ({ ...L, W: L.W.map(r => Float64Array.from(r)), b: Float64Array.from(L.b) })) });
+  const nParams = net => net.layers.reduce((s, L) => s + L.nOut * (L.nIn + 1), 0);
+
+  return { create, forward, backward, predict, trainer, mse, clone, nParams, mulberry32 };
+})();
+</script>
+<script>
+// ===================================================================
 // 화면(UI) 코드
 // ===================================================================
 // GitHub에 함께 올린 데이터 파일 목록. 파일을 추가하면 여기에 한 줄 추가하세요.
@@ -410,7 +624,8 @@ function refresh() {
   const ok = xn !== yn && x.length >= 5;
   $("emptyMsg").hidden = ok;
   if (!ok) { $("emptyMsg").textContent = xn === yn ? "X축과 Y축에 서로 다른 열을 골라주세요." : "분석할 수 있는 데이터가 너무 적습니다."; return; }
-  renderData(); renderLinear(); renderPoly();
+  renderData(); renderLinear(); renderPoly(); nnSetup();
+  if ($("panel-nn").classList.contains("active")) nnTrain();
 }
 
 // ---------------- 공통 그래프 설정
@@ -516,11 +731,274 @@ function renderPoly() {
   } else { $("powEq").textContent = "거듭제곱 모델: 0보다 큰 값이 부족해 계산할 수 없습니다."; $("powNote").textContent = ""; }
 }
 
+// ---------------- 인공신경망 탭
+const nnS = { inputs: [], tk: null, windCol: null, running: false, stopReq: false, runId: 0, started: false, log: [] };
+const numOf = v => (v === "" || v == null) ? NaN : Number(v);
+// "2025-09-26 1:00" 같은 일시 문자열 → 1970년부터 센 시간(정수). 1시간 전·24시간 묶음 계산에 사용
+const parseHour = s => { const m = String(s).match(/(\d{4})[-./](\d{1,2})[-./](\d{1,2})[ T]+(\d{1,2})(?::(\d{2}))?/);
+  return m ? Date.UTC(+m[1], m[2] - 1, +m[3], +m[4], +(m[5] || 0)) / 3600000 : NaN; };
+const hourText = t => new Date(t * 3600000).toISOString().slice(0, 16).replace("T", " ");
+function corr(a, b) {
+  let n = 0, sa = 0, sb = 0, saa = 0, sbb = 0, sab = 0;
+  for (let i = 0; i < a.length; i++) { if (!isFinite(a[i]) || !isFinite(b[i])) continue; n++; sa += a[i]; sb += b[i]; saa += a[i] * a[i]; sbb += b[i] * b[i]; sab += a[i] * b[i]; }
+  const va = saa / n - (sa / n) ** 2, vb = sbb / n - (sb / n) ** 2;
+  return va > 0 && vb > 0 ? (sab / n - sa * sb / n / n) / Math.sqrt(va * vb) : 0;
+}
+
+// 데이터가 바뀌면 입력 변수 후보를 다시 만든다
+function nnSetup() {
+  const target = state.yName, cols = state.numCols.filter(c => c !== target);
+  const windCol = cols.find(c => c.includes("풍속") && !/GUST/i.test(c)) || null;
+  const timeCol = state.cols.find(c => /일시|시각|날짜|date|time/i.test(c));
+  const tk = timeCol ? state.rows.map(r => parseHour(r[timeCol])) : null;
+  const hasTime = !!tk && tk.filter(isFinite).length > state.rows.length * 0.9;
+  nnS.tk = hasTime ? tk : null; nnS.windCol = windCol;
+  const tv = state.rows.map(r => numOf(r[target]));
+  const items = [];
+  for (const c of cols) {
+    const v = state.rows.map(r => numOf(r[c])), fin = v.filter(isFinite);
+    if (fin.length < 10) continue;
+    const m = RG.mean(fin); if (!fin.some(a => a !== m)) continue;   // 지점번호처럼 값이 하나뿐인 열은 제외
+    const dir = /풍향|deg|direction/i.test(c), r = corr(v, tv), leak = Math.abs(r) > 0.95;
+    items.push({ id: "c:" + c, col: c, kind: dir ? "dir" : "num", label: c, leak, on: !leak,
+      note: leak ? `예측할 값과 상관계수 ${r.toFixed(2)}: 사실상 정답을 알려주는 셈이라 제외 권장`
+        : dir ? "sin·cos 두 값으로 바꿔 입력 (359°와 1°가 가깝도록)"
+        : /주기/.test(c) ? "주기가 길면 먼 곳에서 온 너울" : "" });
+  }
+  if (hasTime && windCol) {
+    items.push({ id: "lag", col: windCol, kind: "lag", label: "과거 풍속 (3·6·12시간 전)", note: "파도가 바람을 받아 자라는 데 걸리는 시간", on: true });
+    items.push({ id: "m24", col: windCol, kind: "m24", label: "최근 24시간 평균 풍속", note: "바람이 얼마나 오래 불었는지 (지속시간)", on: true });
+  }
+  const rank = it => it.col === windCol && it.kind === "num" ? 0 : it.kind === "num" ? 1 : it.kind === "dir" ? 2 : 3;
+  items.sort((a, b) => rank(a) - rank(b));
+  const prev = new Map(nnS.inputs.map(i => [i.id, i.on]));
+  items.forEach(i => { if (prev.has(i.id) && !i.leak) i.on = prev.get(i.id); });
+  nnS.inputs = items;
+  $("nnInputs").innerHTML = items.map((it, k) => `<label class="inp${it.leak ? " leak" : ""}"><input type="checkbox" data-k="${k}"${it.on ? " checked" : ""}>` +
+    `<span>${esc(it.label)}${it.note ? `<small>${esc(it.note)}</small>` : ""}</span></label>`).join("") || `<p class="note">입력으로 쓸 숫자 열이 없습니다.</p>`;
+  const dayOpt = $("nnSplit").querySelector("[value=day]");
+  dayOpt.disabled = !hasTime; if (!hasTime) $("nnSplit").value = "hour";
+  $("nnTitle").textContent = `인공신경망: 여러 변수로 ${target} 예측하기`;
+  $("nnBaseLbl").textContent = `테스트 R² 2차 다항 (${state.xName} 하나)`;
+  nnReset(nnS.started ? "데이터가 바뀌었습니다. '학습 시작'을 누르세요." : "");
+}
+
+function nnReset(msg = "설정이 바뀌었습니다. '학습 시작'을 누르면 새로 학습합니다.") {
+  nnS.runId++; nnS.running = false;
+  $("nnRun").textContent = "학습 시작"; $("nnRun").classList.remove("stop");
+  if (msg !== null) $("nnStatus").textContent = msg;
+}
+
+// 선택한 입력 변수로 학습용 표(X, y)를 만들고 학습 / 검증 / 테스트로 나눈다
+function nnPrepare() {
+  const sel = nnS.inputs.filter(i => i.on);
+  if (!sel.length) throw new Error("입력 변수를 하나 이상 고르세요");
+  const rows = state.rows, tk = nnS.tk, drop = $("dropNeg").checked;
+  const byT = tk ? new Map(tk.map((t, i) => [t, i])) : null;
+  const windAt = t => { const i = byT.get(t); return i === undefined ? NaN : numOf(rows[i][nnS.windCol]); };
+  const names = [], groups = [];
+  sel.forEach(it => {
+    const add = (...n) => { groups.push(n.map((_, k) => names.length + k)); names.push(...n); };
+    if (it.kind === "dir") add(it.col + " sin", it.col + " cos");
+    else if (it.kind === "lag") add("풍속 3시간 전", "풍속 6시간 전", "풍속 12시간 전");
+    else if (it.kind === "m24") add("24시간 평균 풍속");
+    else add(it.col);
+  });
+  const X = [], Y = [], T = [], XB = [];
+  for (let i = 0; i < rows.length; i++) {
+    const y = numOf(rows[i][state.yName]), xb = numOf(rows[i][state.xName]);
+    if (!isFinite(y) || !isFinite(xb) || (drop && (y <= 0 || xb <= 0))) continue;   // 과제 1과 같은 정제
+    const t = tk ? tk[i] : i, f = [];
+    for (const it of sel) {
+      if (it.kind === "num") f.push(numOf(rows[i][it.col]));
+      else if (it.kind === "dir") { const a = numOf(rows[i][it.col]) * Math.PI / 180; f.push(Math.sin(a), Math.cos(a)); }
+      else if (it.kind === "lag") f.push(windAt(t - 3), windAt(t - 6), windAt(t - 12));
+      else if (it.kind === "m24") { let s = 0, n = 0; for (let k = 0; k < 24; k++) { const w = windAt(t - k); if (isFinite(w)) { s += w; n++; } } f.push(n >= 18 ? s / n : NaN); }
+    }
+    if (f.some(v => !isFinite(v))) continue;   // 과거 자료가 없는 처음 몇 시간 등은 제외
+    X.push(f); Y.push(y); T.push(t); XB.push(xb);
+  }
+  if (X.length < 30) throw new Error("학습에 쓸 수 있는 데이터가 너무 적습니다");
+  // 나누기: '하루 단위'는 같은 날의 24시간을 통째로 한쪽에 넣는다 (1시간 차이 나는 거의 같은 값이 학습·테스트에 나뉘어 들어가 점수가 부풀려지는 것을 막음)
+  const mode = $("nnSplit").value, rnd = NN.mulberry32(42), lab = new Map(), part = [];
+  for (let i = 0; i < X.length; i++) {
+    const key = mode === "day" ? Math.floor(T[i] / 24) : i;
+    if (!lab.has(key)) { const u = rnd(); lab.set(key, u < 0.15 ? 2 : u < 0.30 ? 1 : 0); }   // 0 학습, 1 검증, 2 테스트
+    part.push(lab.get(key));
+  }
+  const tr = [], va = [], te = []; part.forEach((p, i) => [tr, va, te][p].push(i));
+  // 표준화: 학습 데이터의 평균·표준편차로 모든 입력을 평균 0, 표준편차 1로 (과제 1 경사하강법과 같은 이유)
+  const d = names.length, mu = [], sd = [];
+  for (let j = 0; j < d; j++) { const v = tr.map(i => X[i][j]), m = RG.mean(v); mu.push(m); sd.push(Math.sqrt(RG.mean(v.map(a => (a - m) ** 2))) || 1); }
+  const ym = RG.mean(tr.map(i => Y[i])), ys = Math.sqrt(RG.mean(tr.map(i => (Y[i] - ym) ** 2))) || 1;
+  const Z = X.map(x => Float64Array.from(x, (v, j) => (v - mu[j]) / sd[j]));
+  const pick = (a, ii) => ii.map(i => a[i]);
+  return { sel, names, groups, d, X, Y, T, XB, Z, tr, va, te, mu, sd, ym, ys, mode,
+    Xtr: pick(Z, tr), Ytr: tr.map(i => (Y[i] - ym) / ys), Xva: pick(Z, va), Yva: va.map(i => (Y[i] - ym) / ys) };
+}
+
+async function nnTrain() {
+  if (nnS.running) { nnS.stopReq = true; return; }   // 학습 중에 누르면 멈춤
+  let P;
+  try { P = nnPrepare(); } catch (e) { $("nnStatus").textContent = e.message; return; }
+  const id = ++nnS.runId; nnS.running = true; nnS.stopReq = false; nnS.started = true;
+  $("nnRun").textContent = "멈춤"; $("nnRun").classList.add("stop"); $("nnDiverge").hidden = true;
+  ["nnR2", "nnR2Poly", "nnRmse", "nnBest"].forEach(k => { $(k).textContent = "-"; });
+  const hidden = $("nnArch").value.split(",").map(Number), act = $("nnAct").value, opt = $("nnOpt").value;
+  const lr = Number($("nnLr").value), epochs = Number($("nnEp").value);
+  const net = NN.create([P.d, ...hidden, 1], act, 1);
+  const trainer = NN.trainer(net, P.Xtr, P.Ytr, { lr, optimizer: opt, batch: 64, seed: 3 });
+  const hist = { tr: [], va: [] }, v0 = NN.mse(net, P.Xva, P.Yva);
+  let best = { va: Infinity, net: NN.clone(net), ep: 0 }, diverged = false;
+  drawNet(net, P);
+  for (let e = 0; e < epochs; e++) {
+    const l = trainer.epoch(), v = NN.mse(net, P.Xva, P.Yva);
+    if (!isFinite(l) || !isFinite(v) || v > Math.max(v0, 1) * 1e4) { diverged = true; break; }
+    hist.tr.push(l); hist.va.push(v);
+    if (v < best.va) best = { va: v, net: NN.clone(net), ep: e + 1 };   // 검증 손실이 가장 낮을 때의 가중치를 저장
+    $("nnStatus").textContent = `에포크 ${e + 1} / ${epochs} · 학습 손실 ${l.toFixed(4)} · 검증 손실 ${v.toFixed(4)}`;
+    $("nnProg").style.width = ((e + 1) / epochs * 100) + "%";
+    drawLoss(hist, best.ep);
+    if ((e + 1) % 5 === 0) drawNet(net, P);
+    await new Promise(r => setTimeout(r, 0));   // 화면을 그릴 틈을 준다
+    if (id !== nnS.runId) return;               // 설정이 바뀌어 학습이 취소됨
+    if (nnS.stopReq) break;
+  }
+  nnS.running = false; $("nnRun").textContent = "학습 시작"; $("nnRun").classList.remove("stop");
+  $("nnDiverge").hidden = !diverged;
+  if (diverged && !hist.tr.length) { $("nnStatus").textContent = "첫 에포크에서 발산했습니다. 학습률을 낮춰보세요."; return; }
+  drawLoss(hist, best.ep);
+  nnFinish(P, best, { hidden, act, opt, lr, epochs, done: hist.tr.length });
+}
+
+function nnFinish(P, best, cfgx) {
+  const net = best.net, pred = i => NN.predict(net, P.Z[i]) * P.ys + P.ym;
+  const pAll = P.Z.map((_, i) => pred(i));
+  const yTe = P.te.map(i => P.Y[i]), yTr = P.tr.map(i => P.Y[i]);
+  const pTe = P.te.map(i => pAll[i]), pTr = P.tr.map(i => pAll[i]);
+  const r2Te = RG.r2(yTe, pTe), r2Tr = RG.r2(yTr, pTr), rmTe = RG.rmse(yTe, pTe);
+  // 비교 기준: 과제 1의 2차 다항 회귀 (X축 변수 하나, 같은 학습 데이터로 맞춤)
+  const pm = RG.polyFit(P.tr.map(i => P.XB[i]), yTr, 2), pPoly = P.XB.map(pm.predict);
+  const r2Poly = RG.r2(yTe, P.te.map(i => pPoly[i]));
+  $("nnR2").textContent = fmt(r2Te); $("nnR2Poly").textContent = fmt(r2Poly);
+  $("nnRmse").textContent = fmt(rmTe); $("nnBest").textContent = `${best.ep} / ${cfgx.done}`;
+  $("nnStatus").textContent = `학습 완료 · 학습 ${P.tr.length.toLocaleString()}개, 검증 ${P.va.length.toLocaleString()}개, 테스트 ${P.te.length.toLocaleString()}개 · 가중치 ${NN.nParams(net).toLocaleString()}개`;
+  drawNet(net, P);
+
+  // 예측 vs 실제
+  const lo = Math.min(...yTe, ...pTe), hi = Math.max(...yTe, ...pTe);
+  Plotly.react("nnScatter", [
+    { x: yTe, y: P.te.map(i => pPoly[i]), type: "scattergl", mode: "markers", name: "2차 다항", marker: { color: C.grey, size: 4, opacity: 0.35 } },
+    { x: yTe, y: pTe, type: "scattergl", mode: "markers", name: "인공신경망", marker: { color: C.signal, size: 4, opacity: 0.5 } },
+    { x: [lo, hi], y: [lo, hi], mode: "lines", name: "예측 = 실제", line: { color: C.ink, width: 1.5, dash: "dash" } },
+  ], baseLayout("실제 " + state.yName, "예측 " + state.yName), cfg);
+
+  // 입력 변수 중요도 (순열 중요도): 한 변수만 섞었을 때 테스트 R²가 떨어지는 정도
+  const rnd = NN.mulberry32(5), imp = P.groups.map((g, gi) => {
+    let drop = 0;
+    for (let rep = 0; rep < 3; rep++) {
+      const perm = P.te.slice(); for (let i = perm.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [perm[i], perm[j]] = [perm[j], perm[i]]; }
+      const p = P.te.map((i, k) => { const z = Float64Array.from(P.Z[i]); for (const j of g) z[j] = P.Z[perm[k]][j]; return NN.predict(net, z) * P.ys + P.ym; });
+      drop += r2Te - RG.r2(yTe, p);
+    }
+    return { name: P.sel[gi].label, v: drop / 3 };
+  }).sort((a, b) => a.v - b.v);
+  Plotly.react("nnImpChart", [{ type: "bar", orientation: "h", x: imp.map(d => d.v), y: imp.map(d => d.name), marker: { color: C.sea },
+    text: imp.map(d => d.v.toFixed(3)), textposition: "outside", cliponaxis: false, hovertemplate: "%{y}<br>R² 감소 %{x:.3f}<extra></extra>" }],
+    baseLayout("섞었을 때 테스트 R² 감소량", "", { showlegend: false, margin: { l: 170, r: 40, t: 10, b: 48 } }), cfg);
+
+  // 입력이 하나뿐이면 신경망이 학습한 곡선을 그린다
+  const one = P.sel.length === 1 && P.sel[0].kind === "num";
+  $("nnCurveCard").hidden = !one;
+  if (one) {
+    const xs = P.X.map(x => x[0]), g0 = Math.min(...xs), g1 = Math.max(...xs), g = Array.from({ length: 200 }, (_, i) => g0 + (g1 - g0) * i / 199);
+    const pmOne = RG.polyFit(P.tr.map(i => xs[i]), yTr, 2);
+    Plotly.react("nnCurveChart", [
+      { x: xs, y: P.Y, type: "scattergl", mode: "markers", name: "관측값", marker: { color: C.sea, size: 4, opacity: 0.25 } },
+      { x: g, y: g.map(pmOne.predict), mode: "lines", name: "2차 다항 (과제 1)", line: { color: C.grey, width: 2, dash: "dash" } },
+      { x: g, y: g.map(v => NN.predict(net, [(v - P.mu[0]) / P.sd[0]]) * P.ys + P.ym), mode: "lines", name: "인공신경망", line: { color: C.signal, width: 3 } },
+    ], baseLayout(P.sel[0].col, state.yName), cfg);
+  }
+
+  // 시간에 따른 비교
+  $("nnTsCard").hidden = !nnS.tk;
+  if (nnS.tk) {
+    const xs = [], ya = [], yn = [], yp = [];
+    for (let i = 0; i < P.T.length; i++) {
+      if (i > 0 && P.T[i] - P.T[i - 1] > 1) { xs.push(null); ya.push(null); yn.push(null); yp.push(null); }   // 자료가 빠진 시간은 선을 끊는다
+      xs.push(hourText(P.T[i])); ya.push(P.Y[i]); yn.push(pAll[i]); yp.push(pPoly[i]);
+    }
+    let k = 0; P.XB.forEach((v, i) => { if (v > P.XB[k]) k = i; });
+    const range = [hourText(P.T[k] - 120), hourText(P.T[k] + 120)];
+    const teX = P.te.map(i => hourText(P.T[i])), teY = P.te.map(i => P.Y[i]);
+    Plotly.react("nnTsChart", [
+      { x: xs, y: ya, mode: "lines", name: "실제", line: { color: C.ink, width: 2 } },
+      { x: xs, y: yp, mode: "lines", name: "2차 다항", line: { color: C.grey, width: 1.5, dash: "dash" } },
+      { x: xs, y: yn, mode: "lines", name: "인공신경망", line: { color: C.signal, width: 2 } },
+      { x: teX, y: teY, mode: "markers", name: "테스트용 시각", marker: { color: C.teal, size: 4 } },
+    ], baseLayout("일시", state.yName, { xaxis: { type: "date", range, gridcolor: "#e6ecef", rangeslider: { thickness: 0.08 } } }), cfg);
+    $("nnTsNote").textContent = `처음에는 ${state.xName}이(가) 가장 컸던 ${hourText(P.T[k])} 앞뒤 5일을 보여줍니다. 아래 막대를 끌면 다른 기간도 볼 수 있습니다. 초록 점은 학습에 쓰지 않은 테스트 데이터입니다.`;
+  }
+
+  // 실험 기록
+  nnS.log.push({ inputs: P.sel.map(s => s.label).join(", "), arch: `${P.d} → ${cfgx.hidden.join(" → ")} → 1`, act: cfgx.act,
+    opt: (cfgx.opt === "adam" ? "Adam " : "경사하강법 ") + cfgx.lr, split: P.mode === "day" ? "하루 단위" : "1시간 무작위",
+    ep: `${best.ep} / ${cfgx.done}`, r2Tr, r2Te, rmTe, r2Poly });
+  renderLog();
+}
+
+function renderLog() {
+  if (!nnS.log.length) { $("nnLog").innerHTML = ""; return; }
+  const top = Math.max(...nnS.log.map(r => r.r2Te));
+  $("nnLog").innerHTML = "<thead><tr><th>#</th><th>입력 변수</th><th>구조</th><th>활성화</th><th>학습 방법 · 학습률</th><th>나누기</th><th>최적 / 전체 에포크</th><th>학습 R²</th><th>테스트 R²</th><th>테스트 RMSE</th><th>2차 다항 테스트 R²</th></tr></thead><tbody>" +
+    nnS.log.map((r, i) => `<tr class="${r.r2Te === top ? "best" : ""}"><td>${i + 1}</td><td style="text-align:left;white-space:normal;min-width:220px">${esc(r.inputs)}</td><td>${r.arch}</td><td>${r.act}</td><td>${r.opt}</td><td>${r.split}</td><td>${r.ep}</td><td>${fmt(r.r2Tr)}</td><td>${fmt(r.r2Te)}</td><td>${fmt(r.rmTe)}</td><td>${fmt(r.r2Poly)}</td></tr>`).join("") + "</tbody>";
+}
+
+function drawLoss(hist, bestEp) {
+  const ep = hist.tr.map((_, i) => i + 1);
+  Plotly.react("nnLossChart", [
+    { x: ep, y: hist.tr, mode: "lines", name: "학습 손실", line: { color: C.sea, width: 2 } },
+    { x: ep, y: hist.va, mode: "lines", name: "검증 손실", line: { color: C.signal, width: 2 } },
+  ], baseLayout("에포크", "손실 (평균 제곱 오차, 로그 눈금)", { yaxis: { type: "log", title: { text: "손실 (평균 제곱 오차, 로그 눈금)" }, gridcolor: "#e6ecef" },
+    shapes: bestEp ? [{ type: "line", x0: bestEp, x1: bestEp, yref: "paper", y0: 0, y1: 1, line: { color: C.grey, width: 1, dash: "dot" } }] : [],
+    annotations: bestEp ? [{ x: bestEp, yref: "paper", y: 1, text: `최적 ${bestEp}`, showarrow: false, yanchor: "bottom", font: { size: 11, color: C.grey } }] : [] }), cfg);
+}
+
+// 신경망 구조 그림 (SVG): 선 굵기 = 가중치 크기, 색 = 부호
+function drawNet(net, P) {
+  const sizes = net.sizes, W = 640, H = 420, left = 150, right = 92, top = 24, bottom = 34;
+  const xs = sizes.map((_, l) => left + (W - left - right) * l / (sizes.length - 1));
+  const ys = sizes.map(n => Array.from({ length: n }, (_, i) => n === 1 ? (top + H - bottom) / 2 : top + (H - top - bottom) * i / (n - 1)));
+  let maxW = 0; net.layers.forEach(L => L.W.forEach(r => r.forEach(w => { maxW = Math.max(maxW, Math.abs(w)); })));
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="신경망 구조"><g fill="none">`;
+  net.layers.forEach((L, l) => L.W.forEach((row, j) => row.forEach((w, i) => {
+    const a = Math.abs(w) / (maxW || 1);
+    s += `<line x1="${xs[l]}" y1="${ys[l][i]}" x2="${xs[l + 1]}" y2="${ys[l + 1][j]}" stroke="${w >= 0 ? C.signal : C.sea}" stroke-width="${(0.3 + 2.6 * a).toFixed(2)}" stroke-opacity="${(0.08 + 0.7 * a).toFixed(2)}"/>`;
+  })));
+  s += "</g>";
+  const r = n => Math.max(3, Math.min(8, (H - top - bottom) / n / 2.6));
+  sizes.forEach((n, l) => ys[l].forEach(y => { s += `<circle cx="${xs[l]}" cy="${y}" r="${r(n)}" fill="#fff" stroke="${C.ink}" stroke-width="1.2"/>`; }));
+  P.names.forEach((nm, i) => { s += `<text x="${xs[0] - 12}" y="${ys[0][i] + 4}" text-anchor="end" font-size="11.5" fill="${C.ink}">${esc(nm)}</text>`; });
+  s += `<text x="${xs[xs.length - 1] + 12}" y="${ys[ys.length - 1][0] + 4}" font-size="11.5" fill="${C.ink}">${esc(state.yName)}</text>`;
+  sizes.forEach((n, l) => { const t = l === 0 ? `입력층 ${n}` : l === sizes.length - 1 ? "출력층" : `은닉층 ${l} (${n})`;
+    s += `<text x="${xs[l]}" y="${H - 8}" text-anchor="middle" font-size="12" fill="${C.grey}">${t}</text>`; });
+  $("nnNet").innerHTML = s + "</svg>";
+}
+
+$("nnRun").addEventListener("click", nnTrain);
+$("nnInputs").addEventListener("change", e => { const k = e.target.dataset.k; if (k != null) { nnS.inputs[k].on = e.target.checked; nnReset(); } });
+["nnArch", "nnAct", "nnLr", "nnSplit"].forEach(id => $(id).addEventListener("change", () => nnReset()));
+$("nnOpt").addEventListener("change", () => { $("nnLr").value = $("nnOpt").value === "adam" ? "0.003" : "0.1"; nnReset(); });
+$("nnEp").addEventListener("input", () => { $("nnEpVal").textContent = $("nnEp").value; });
+$("nnEp").addEventListener("change", () => nnReset());
+$("nnLogClear").addEventListener("click", () => { nnS.log = []; renderLog(); });
+
 // ---------------- 이벤트 연결
 document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click", () => {
   document.querySelectorAll(".tabs button").forEach(o => o.setAttribute("aria-selected", o === b));
   document.querySelectorAll(".panel").forEach(p => p.classList.toggle("active", p.id === "panel-" + b.dataset.tab));
   window.dispatchEvent(new Event("resize")); // 숨겨져 있던 그래프 크기 다시 맞추기
+  if (b.dataset.tab === "nn" && !nnS.started && !nnS.running && state.x.length) nnTrain();   // 처음 열면 자동으로 학습
 }));
 ["xSel", "ySel", "dropNeg"].forEach(id => $(id).addEventListener("change", refresh));
 $("lrSel").addEventListener("change", () => state.x.length && renderLinear());
