@@ -28,3 +28,19 @@
 - `index.html` : 프로그램 전체 (화면 + 회귀 알고리즘 + 인공신경망 + 대화형 AI, JavaScript)
 - `geomundo_buoy.csv` : 기상청 기상자료개방포털 해양기상부이 거문도(22103) 시간자료
 - `app.py`, `regression.py` : 과제 1 회귀 알고리즘의 Python 버전 (Streamlit)
+
+## 출처와 라이선스
+| 구분 | 이름 | 만든 곳 | 라이선스 |
+| --- | --- | --- | --- |
+| 데이터 | 해양기상부이 거문도(22103) 시간자료 | 기상청 기상자료개방포털 (https://data.kma.go.kr) | 공공데이터 (출처 표시) |
+| 언어모델 | Qwen2.5-1.5B-Instruct, Qwen2.5-0.5B-Instruct | Alibaba Cloud (Qwen 팀) | Apache License 2.0 |
+| 언어모델 | Llama-3.2-1B-Instruct | Meta | Llama 3.2 Community License — Built with Llama |
+| 언어모델 | Gemma-2-2B-it | Google | Gemma Terms of Use |
+| 실행 엔진 | WebLLM 0.2.79 (https://github.com/mlc-ai/web-llm) | MLC AI | Apache License 2.0 |
+| 모델 파일 | 브라우저용 변환 모델 (https://huggingface.co/mlc-ai) | MLC AI | 원본 모델의 라이선스를 따름 |
+| 라이브러리 | Plotly.js 2.35.2 (그래프) | Plotly | MIT License |
+| 라이브러리 | SheetJS 0.20.3 (엑셀 읽기) | SheetJS | Apache License 2.0 |
+
+- 모든 구성 요소는 무료이며, 사이트 이용에 로그인·결제·API 키가 필요하지 않습니다.
+- 언어모델은 방문자의 브라우저(WebGPU)에서 실행되며 질문 내용은 외부 서버로 전송되지 않습니다.
+- 회귀분석과 인공신경망 알고리즘은 외부 라이브러리 없이 직접 구현했습니다.
