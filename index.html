@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>해양 관측 데이터 회귀분석 · 인공신경망</title>
+<title>해양 관측 데이터 회귀분석 · 인공신경망 · 대화형 AI</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -88,6 +88,29 @@
   #nnNet svg { width: 100%; height: 100%; }
   .legend-line { font-size: 12.5px; color: var(--muted); margin-top: 6px; }
   .legend-line b { display: inline-block; width: 18px; height: 3px; vertical-align: middle; margin: 0 4px 0 10px; }
+  /* ---------- 대화형 AI 탭 ---------- */
+  .ai-ctl { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 4px 22px; align-items: start; }
+  .ai-ctl .progress, .ai-ctl #aiProgText { grid-column: 1 / -1; }
+  .ai-ctl label { font-size: 13px; color: var(--muted); display: block; margin-bottom: 4px; }
+  .ai-ctl select { width: 100%; }
+  .chat { border: 1px solid var(--rule); border-radius: 10px; background: #f7fafb; padding: 14px; margin: 12px 0; height: 420px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+  .msg { max-width: 82%; padding: 9px 13px; border-radius: 12px; font-size: 14.5px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .msg.user { align-self: flex-end; background: var(--sea); color: #fff; border-bottom-right-radius: 4px; }
+  .msg.bot { align-self: flex-start; background: #fff; border: 1px solid var(--rule); border-bottom-left-radius: 4px; }
+  .msg.sys { align-self: center; background: none; color: var(--muted); font-size: 13px; text-align: center; max-width: 100%; }
+  .msg.err { align-self: center; background: #fdecea; color: var(--warn); font-size: 13.5px; }
+  .msg .meta { display: block; margin-top: 6px; font-size: 12px; color: var(--muted); white-space: normal; }
+  .msg.bot.typing::after { content: "▍"; color: var(--signal); animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .examples { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  .composer { display: flex; gap: 10px; align-items: stretch; }
+  .composer textarea { flex: 1; font: inherit; font-size: 15px; padding: 9px 11px; border: 1px solid var(--rule); border-radius: 8px; resize: vertical; min-height: 46px; }
+  .composer textarea:focus-visible { outline: 2px solid var(--signal); outline-offset: 1px; }
+  .composer-btns { display: flex; flex-direction: column; gap: 6px; }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .sysview { white-space: pre-wrap; font-size: 12.5px; background: #f7fafb; border: 1px solid var(--rule); border-radius: 8px; padding: 10px 12px; max-height: 320px; overflow: auto; }
+  details summary { cursor: pointer; }
+  @media (max-width: 1000px) { .ai-ctl { grid-template-columns: 1fr; } .msg { max-width: 92%; } .composer { flex-direction: column; } .composer-btns { flex-direction: row; } }
   @media (max-width: 1000px) { .nn-grid { grid-template-columns: 1fr; } }
   @media (max-width: 1000px) { .grid2 { grid-template-columns: 1fr; } .metrics { grid-template-columns: repeat(2, 1fr); } }
   @media (max-width: 800px) { .layout { grid-template-columns: 1fr; padding: 14px; } aside { position: static; } header { padding: 18px 16px; } }
@@ -95,8 +118,8 @@
 </head>
 <body>
 <header>
-  <h1>해양 관측 데이터 회귀분석 · 인공신경망</h1>
-  <p>데이터를 불러와 X·Y축을 고르면 선형회귀, 비선형회귀, 인공신경망을 비교합니다. 모든 알고리즘은 라이브러리 없이 직접 구현했습니다.</p>
+  <h1>해양 관측 데이터 회귀분석 · 인공신경망 · 대화형 AI</h1>
+  <p>데이터를 불러와 X·Y축을 고르면 선형회귀, 비선형회귀, 인공신경망을 비교합니다. 회귀와 신경망 알고리즘은 라이브러리 없이 직접 구현했고, 대화형 AI 탭에서는 오픈소스 LLM을 브라우저에서 직접 실행합니다.</p>
   <div class="dataset-line" id="datasetLine">데이터를 불러오는 중…</div>
 </header>
 
@@ -126,6 +149,10 @@
       <h2>인공신경망 탭</h2>
       <p class="note">Y축으로 고른 열을 예측합니다. 입력 변수는 탭 안에서 여러 개를 고를 수 있습니다.</p>
     </section>
+    <section>
+      <h2>대화형 AI 탭</h2>
+      <p class="note">PC의 Chrome 또는 Edge에서 실행하세요. 처음 한 번은 모델 파일(수백 MB~1GB대)을 내려받습니다.</p>
+    </section>
   </aside>
 
   <main>
@@ -134,6 +161,7 @@
       <button role="tab" aria-selected="false" data-tab="lin">선형회귀</button>
       <button role="tab" aria-selected="false" data-tab="poly">비선형회귀</button>
       <button role="tab" aria-selected="false" data-tab="nn">인공신경망</button>
+      <button role="tab" aria-selected="false" data-tab="ai">대화형 AI</button>
     </nav>
 
     <div id="emptyMsg" class="empty" hidden>왼쪽에서 데이터 파일을 선택하면 분석을 시작합니다.</div>
@@ -286,9 +314,68 @@
         <p style="margin:10px 0 0"><button class="btn ghost" id="nnLogClear">기록 지우기</button></p>
       </div>
     </div>
+    <!-- ===================== 대화형 AI 탭 ===================== -->
+    <div class="panel" id="panel-ai">
+      <div class="card">
+        <h3>대화형 AI: 오픈소스 LLM을 내 브라우저에서 실행하기</h3>
+        <p class="explain">오픈소스 언어모델(LLM)의 파일을 내려받아 <b>내 컴퓨터의 그래픽카드(GPU)</b>로 직접 실행합니다. ChatGPT처럼 회사 서버에 질문을 보내지 않고,
+          API 키나 회원가입도 필요 없습니다. 실행 엔진은 오픈소스 <b>WebLLM</b>(브라우저용 LLM 실행기)을 사용합니다.
+          모델 파일은 처음 한 번만 내려받고, 그다음부터는 브라우저에 저장된 파일을 씁니다.</p>
+        <div id="aiGpuMsg" class="warn-box" hidden></div>
+        <div class="ai-ctl">
+          <div><label for="aiModel">모델 고르기</label><select id="aiModel"></select>
+            <p class="note" id="aiModelNote"></p></div>
+          <div class="run-row" style="margin-top:22px">
+            <button class="btn" id="aiLoad">모델 불러오기</button>
+            <span class="status" id="aiStatus" aria-live="polite">아직 모델을 불러오지 않았습니다.</span>
+          </div>
+          <div class="progress"><i id="aiProg"></i></div>
+          <p class="note" id="aiProgText"></p>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>대화하기</h3>
+        <label class="check"><input type="checkbox" id="aiCtx" checked> 이 프로그램의 분석 결과를 AI에게 알려주기 (과제 1·2 결과와 연동)</label>
+        <div class="chat" id="aiChat" aria-live="polite">
+          <div class="msg sys">모델을 불러온 뒤 아래에 질문을 입력하세요. 예시 버튼을 눌러도 됩니다.</div>
+        </div>
+        <div class="examples" id="aiExamples">
+          <button class="btn ghost">안녕? 너는 누구야?</button>
+          <button class="btn ghost">유의파고가 뭔지 중학생도 알게 설명해줘</button>
+          <button class="btn ghost">풍속이 강해지면 파고는 어떻게 변해?</button>
+          <button class="btn ghost">지금 데이터에서 가장 잘 맞는 모델은 뭐야?</button>
+        </div>
+        <div class="composer">
+          <textarea id="aiInput" rows="2" placeholder="질문을 입력하고 Enter (줄바꿈은 Shift+Enter)" disabled></textarea>
+          <div class="composer-btns">
+            <button class="btn" id="aiSend" disabled>보내기</button>
+            <button class="btn ghost" id="aiStop" hidden>멈춤</button>
+          </div>
+        </div>
+        <p style="margin:8px 0 0;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn ghost" id="aiClear">대화 지우기</button>
+          <button class="btn ghost" id="aiSave">대화 내용 저장 (.txt)</button>
+        </p>
+      </div>
+
+      <div class="card">
+        <h3>테스트 기록</h3>
+        <p class="explain">답변이 끝날 때마다 한 줄씩 추가됩니다. 모델을 바꿔가며 속도와 답변을 비교해 보세요.
+          <b>토큰</b>은 AI가 글을 읽고 쓰는 단위로, 한글은 대략 한 글자가 토큰 1~2개입니다.</p>
+        <div class="tbl-wrap"><table id="aiLog"></table></div>
+      </div>
+
+      <div class="card">
+        <details><summary><b>AI에게 실제로 보내는 안내문 (시스템 프롬프트) 보기</b></summary>
+          <p class="explain" style="margin-top:8px">질문과 함께 아래 안내문이 매번 모델에 들어갑니다. "분석 결과를 AI에게 알려주기"를 켜면 이 프로그램이 계산한 숫자가 포함됩니다.</p>
+          <pre id="aiSysView" class="sysview"></pre>
+        </details>
+      </div>
+    </div>
   </main>
 </div>
-<footer>데이터처리개론 과제 1 · 선형회귀와 비선형회귀 / 과제 2 · 인공신경망을 이용한 데이터 예측</footer>
+<footer>데이터처리개론 과제 1 · 선형회귀와 비선형회귀 / 과제 2 · 인공신경망을 이용한 데이터 예측 / 과제 3 · 오픈소스 LLM 설치 및 실행</footer>
 
 <script>
 // ===================================================================
@@ -993,12 +1080,247 @@ $("nnEp").addEventListener("input", () => { $("nnEpVal").textContent = $("nnEp")
 $("nnEp").addEventListener("change", () => nnReset());
 $("nnLogClear").addEventListener("click", () => { nnS.log = []; renderLog(); });
 
+// ---------------- 대화형 AI 탭 (오픈소스 LLM을 브라우저에서 실행)
+// WebLLM: 오픈소스 LLM을 브라우저의 WebGPU(그래픽카드)로 실행하는 오픈소스 엔진 (Apache-2.0)
+const WEBLLM_URL = "https://esm.run/@mlc-ai/web-llm@0.2.79";
+// 후보 모델 (가벼운 순서가 아니라 추천 순서). 실제로 쓸 수 있는지는 WebLLM의 모델 목록으로 다시 확인한다.
+const AI_MODELS = [
+  { id: "Qwen2.5-1.5B-Instruct-q4f16_1-MLC", name: "Qwen2.5 1.5B (알리바바) · 추천", note: "한국어를 비교적 잘하는 소형 모델" },
+  { id: "Qwen2.5-0.5B-Instruct-q4f16_1-MLC", name: "Qwen2.5 0.5B (알리바바) · 가장 가벼움", note: "빠르지만 한국어 답변이 어색할 수 있음" },
+  { id: "Llama-3.2-1B-Instruct-q4f16_1-MLC", name: "Llama 3.2 1B (메타)", note: "영어에 강하고 한국어는 약한 편" },
+  { id: "gemma-2-2b-it-q4f16_1-MLC", name: "Gemma 2 2B (구글)", note: "조금 더 크고 느리지만 답변이 자연스러운 편" },
+];
+const ai = { lib: null, engine: null, modelId: null, loading: false, busy: false, history: [], log: [], hasF16: true, gpuOk: null };
+
+function aiSetStatus(t) { $("aiStatus").textContent = t; }
+function aiModelInfo(id) {
+  const base = id.replace("q4f32_1", "q4f16_1");
+  const m = AI_MODELS.find(m => m.id === base) || { name: id, note: "" };
+  const rec = ai.lib?.prebuiltAppConfig?.model_list.find(r => r.model_id === id);
+  return { ...m, vram: rec?.vram_required_MB };
+}
+function aiRenderModelNote() {
+  const id = $("aiModel").value; if (!id) return;
+  const m = aiModelInfo(id);
+  $("aiModelNote").textContent = `${m.note}${m.vram ? ` · 필요한 GPU 메모리 약 ${(m.vram / 1024).toFixed(1)}GB` : ""}${id.includes("q4f32") ? " · 이 컴퓨터에 맞춘 q4f32 버전" : ""}`;
+}
+
+// 그래픽카드(WebGPU) 사용 가능 여부 확인
+async function aiCheckGpu() {
+  if (ai.gpuOk !== null) return ai.gpuOk;
+  let msg = "";
+  if (!("gpu" in navigator)) msg = "이 브라우저는 WebGPU(웹에서 그래픽카드를 쓰는 기능)를 지원하지 않습니다. PC의 최신 Chrome 또는 Edge로 열어 주세요.";
+  else {
+    try {
+      const ad = await navigator.gpu.requestAdapter();
+      if (!ad) msg = "그래픽카드를 사용할 수 없습니다. Chrome 설정 → 시스템 → '그래픽 가속 사용'이 켜져 있는지 확인해 주세요.";
+      else ai.hasF16 = ad.features.has("shader-f16");
+    } catch { msg = "그래픽카드 확인 중 오류가 났습니다. PC의 최신 Chrome 또는 Edge로 열어 주세요."; }
+  }
+  $("aiGpuMsg").hidden = !msg; $("aiGpuMsg").textContent = msg;
+  ai.gpuOk = !msg; return ai.gpuOk;
+}
+
+// WebLLM 라이브러리를 처음 필요할 때 한 번만 불러온다
+async function aiLib() {
+  if (!ai.lib) ai.lib = await import(WEBLLM_URL);
+  return ai.lib;
+}
+
+async function aiSetup() {
+  if ($("aiModel").options.length) return;
+  const ok = await aiCheckGpu();
+  // 그래픽카드가 16비트 계산(shader-f16)을 못 하면 같은 모델의 q4f32 버전을 쓴다
+  const ids = AI_MODELS.map(m => ai.hasF16 ? m.id : m.id.replace("q4f16_1", "q4f32_1"));
+  $("aiModel").innerHTML = ids.map((id, i) => `<option value="${esc(id)}">${esc(AI_MODELS[i].name)}</option>`).join("");
+  aiRenderModelNote();
+  $("aiLoad").disabled = !ok;
+  if (!ok) { aiSetStatus("이 브라우저에서는 실행할 수 없습니다."); return; }
+  try {
+    const lib = await aiLib();
+    const known = new Set(lib.prebuiltAppConfig.model_list.map(r => r.model_id));
+    [...$("aiModel").options].forEach(o => { if (!known.has(o.value)) o.remove(); });
+    if (!$("aiModel").options.length) { aiSetStatus("사용할 수 있는 모델이 없습니다."); $("aiLoad").disabled = true; return; }
+    aiRenderModelNote();
+    await aiMarkCached();
+  } catch (e) {
+    aiSetStatus("WebLLM 엔진을 불러오지 못했습니다. 인터넷 연결을 확인하고 새로고침해 주세요.");
+    console.error(e);
+  }
+}
+async function aiMarkCached() {
+  if (typeof ai.lib?.hasModelInCache !== "function") return;
+  for (const o of $("aiModel").options) {
+    try { if (await ai.lib.hasModelInCache(o.value) && !o.textContent.includes("(내려받음)")) o.textContent += " (내려받음)"; } catch {}
+  }
+}
+
+async function aiLoadModel() {
+  if (ai.loading || ai.busy) return;
+  const id = $("aiModel").value; if (!id) return;
+  if (!(await aiCheckGpu())) return;
+  ai.loading = true; $("aiLoad").disabled = true; $("aiModel").disabled = true; aiEnableInput(false);
+  $("aiProg").style.width = "0%"; $("aiProgText").textContent = "";
+  aiSetStatus("WebLLM 엔진 준비 중…");
+  const t0 = performance.now();
+  try {
+    const lib = await aiLib();
+    const progress = r => {
+      $("aiProg").style.width = Math.round((r.progress || 0) * 100) + "%";
+      aiSetStatus(`모델 불러오는 중… ${Math.round((r.progress || 0) * 100)}% (${Math.round((performance.now() - t0) / 1000)}초)`);
+      $("aiProgText").textContent = r.text || "";
+    };
+    if (ai.engine) { ai.engine.setInitProgressCallback?.(progress); await ai.engine.reload(id); }
+    else ai.engine = await lib.CreateMLCEngine(id, { initProgressCallback: progress });
+    ai.modelId = id;
+    const sec = ((performance.now() - t0) / 1000).toFixed(1);
+    $("aiProg").style.width = "100%";
+    aiSetStatus(`준비 완료: ${aiModelInfo(id).name.split(" · ")[0]} (불러오는 데 ${sec}초)`);
+    $("aiProgText").textContent = "";
+    aiAddMsg("sys", `${aiModelInfo(id).name.split(" · ")[0]} 모델을 불러왔습니다. 이제 질문해 보세요.`);
+    aiEnableInput(true); $("aiInput").focus();
+    aiMarkCached();
+  } catch (e) {
+    console.error(e);
+    const m = String(e?.message || e);
+    const hint = /memory|OOM|allocate|Device was lost|DeviceLost/i.test(m)
+      ? "그래픽카드 메모리가 부족한 것 같습니다. 더 가벼운 모델(Qwen2.5 0.5B)을 골라 보세요."
+      : /fetch|network|Failed to fetch|NetworkError/i.test(m) ? "모델 파일을 내려받지 못했습니다. 인터넷 연결을 확인하고 다시 시도해 주세요."
+      : "모델을 불러오지 못했습니다.";
+    aiSetStatus(hint); aiAddMsg("err", `${hint}\n(오류 내용: ${m.slice(0, 200)})`);
+    ai.modelId = null;
+  } finally {
+    ai.loading = false; $("aiLoad").disabled = false; $("aiModel").disabled = false;
+    $("aiLoad").textContent = ai.modelId ? "다른 모델로 바꾸기" : "모델 불러오기";
+  }
+}
+
+function aiEnableInput(on) {
+  $("aiInput").disabled = !on; $("aiSend").disabled = !on;
+  document.querySelectorAll("#aiExamples button").forEach(b => { b.disabled = !on; });
+}
+
+// 이 프로그램이 계산한 분석 결과를 글로 정리 (과제 1·2 연동)
+function aiContext() {
+  if (!state.x.length) return "(아직 불러온 데이터가 없음)";
+  const { x, y } = state, L = [];
+  const st = v => `평균 ${RG.mean(v).toFixed(2)}, 최소 ${Math.min(...v).toFixed(2)}, 최대 ${Math.max(...v).toFixed(2)}`;
+  L.push(`- 데이터: ${state.name}, 전체 ${state.rows.length.toLocaleString()}행 중 분석에 쓴 ${x.length.toLocaleString()}개` +
+    (state.cols.includes("일시") ? `, 기간 ${state.rows[0]["일시"]} ~ ${state.rows[state.rows.length - 1]["일시"]}` : ""));
+  L.push(`- 입력 X = ${state.xName} (${st(x)})`);
+  L.push(`- 예측할 값 Y = ${state.yName} (${st(y)})`);
+  const ls = RG.leastSquares(x, y), pl = x.map(v => ls.a * v + ls.b);
+  const sg = (v, d) => (v < 0 ? " − " : " + ") + Math.abs(v).toFixed(d);   // 부호를 "+ -" 대신 "−"로
+  L.push(`- 선형회귀: Y = ${ls.a.toFixed(4)} × X${sg(ls.b, 4)}, R² = ${RG.r2(y, pl).toFixed(3)}`);
+  const p2 = RG.polyFit(x, y, 2);
+  L.push(`- 2차 다항 회귀: Y = ${p2.coef[0].toFixed(4)}${sg(p2.coef[1], 4)} × X${sg(p2.coef[2], 5)} × X², R² = ${RG.r2(y, x.map(p2.predict)).toFixed(3)}`);
+  const pw = RG.powerFit(x, y);
+  if (pw) L.push(`- 거듭제곱 모델: Y = ${pw.a.toFixed(4)} × X^${pw.b.toFixed(3)}, R² = ${RG.r2(y, x.map(pw.predict)).toFixed(3)}`);
+  const last = nnS.log[nnS.log.length - 1];
+  L.push(last
+    ? `- 인공신경망 (입력: ${last.inputs}, 구조 ${last.arch}): 테스트 R² = ${last.r2Te.toFixed(3)}, 테스트 RMSE = ${last.rmTe.toFixed(3)} (같은 조건의 2차 다항 테스트 R² = ${last.r2Poly.toFixed(3)})`
+    : "- 인공신경망: 아직 학습하지 않음");
+  L.push("- R²는 1에 가까울수록 잘 맞는다는 뜻입니다.");
+  return L.join("\n");
+}
+function aiSystemPrompt() {
+  let s = "당신은 '해양 관측 데이터 분석 프로그램' 안에 있는 친절한 도우미입니다.\n" +
+    "- 반드시 한국어로 답하세요.\n- 중학생도 이해할 수 있게 쉬운 말로, 5문장 이내로 짧게 답하세요.\n" +
+    "- 모르는 것은 지어내지 말고 모른다고 말하세요.";
+  if ($("aiCtx").checked) s += "\n- 데이터나 분석 결과에 대한 질문에는 아래 [분석 결과]의 숫자만 근거로 답하세요.\n\n[분석 결과]\n" + aiContext();
+  return s;
+}
+function aiRefreshSysView() { $("aiSysView").textContent = aiSystemPrompt(); }
+
+function aiAddMsg(kind, text) {
+  const d = document.createElement("div");
+  d.className = "msg " + kind; d.textContent = text;
+  $("aiChat").appendChild(d); $("aiChat").scrollTop = $("aiChat").scrollHeight;
+  return d;
+}
+
+async function aiSend(text) {
+  text = (text ?? $("aiInput").value).trim();
+  if (!text || !ai.engine || !ai.modelId || ai.busy) return;
+  $("aiInput").value = "";
+  ai.busy = true; aiEnableInput(false); $("aiStop").hidden = false; $("aiLoad").disabled = true;
+  aiAddMsg("user", text);
+  const bubble = aiAddMsg("bot typing", "");
+  ai.history.push({ role: "user", content: text });
+  // 작은 모델은 한 번에 기억할 수 있는 글의 양이 적어서 최근 대화 8개만 보낸다
+  const messages = [{ role: "system", content: aiSystemPrompt() }, ...ai.history.slice(-8)];
+  const t0 = performance.now(); let tFirst = 0, out = "", usage = null, stopped = false;
+  try {
+    const stream = await ai.engine.chat.completions.create({
+      messages, stream: true, stream_options: { include_usage: true }, temperature: 0.6, max_tokens: 512,
+    });
+    for await (const ch of stream) {
+      const d = ch.choices?.[0]?.delta?.content || "";
+      if (d) { if (!tFirst) tFirst = performance.now(); out += d; bubble.textContent = out; $("aiChat").scrollTop = $("aiChat").scrollHeight; }
+      if (ch.choices?.[0]?.finish_reason === "abort") stopped = true;
+      if (ch.usage) usage = ch.usage;
+    }
+  } catch (e) {
+    console.error(e); out = out || ""; aiAddMsg("err", "답변 중 오류가 났습니다: " + String(e?.message || e).slice(0, 200));
+  }
+  if (ai.stopReq) stopped = true;
+  const t1 = performance.now(), sec = (t1 - t0) / 1000;
+  const nTok = usage?.completion_tokens ?? null;
+  const tps = nTok && tFirst ? nTok / ((t1 - tFirst) / 1000) : null;
+  bubble.classList.remove("typing");
+  if (!out) bubble.textContent = stopped ? "(답변을 멈췄습니다)" : "(빈 답변)";
+  const meta = document.createElement("span"); meta.className = "meta";
+  meta.textContent = `${aiModelInfo(ai.modelId).name.split(" · ")[0]} · ${sec.toFixed(1)}초` +
+    (tFirst ? ` · 첫 글자까지 ${((tFirst - t0) / 1000).toFixed(1)}초` : "") +
+    (nTok ? ` · 토큰 ${nTok}개 · 초당 ${tps.toFixed(1)}토큰` : "") + (stopped ? " · 중간에 멈춤" : "");
+  bubble.appendChild(meta);
+  if (out) ai.history.push({ role: "assistant", content: out });
+  ai.log.push({ model: aiModelInfo(ai.modelId).name.split(" · ")[0], q: text, a: out, sec, first: tFirst ? (tFirst - t0) / 1000 : null, nTok, tps, ctx: $("aiCtx").checked, stopped });
+  aiRenderLog();
+  ai.busy = false; ai.stopReq = false; $("aiStop").hidden = true; $("aiLoad").disabled = false;
+  aiEnableInput(true); $("aiInput").focus();
+}
+
+function aiRenderLog() {
+  if (!ai.log.length) { $("aiLog").innerHTML = ""; return; }
+  $("aiLog").innerHTML = "<thead><tr><th>#</th><th>모델</th><th>질문</th><th>답변 (앞부분)</th><th>걸린 시간</th><th>첫 글자까지</th><th>토큰 수</th><th>초당 토큰</th><th>분석 결과 연동</th></tr></thead><tbody>" +
+    ai.log.map((r, i) => `<tr><td>${i + 1}</td><td>${esc(r.model)}</td><td style="text-align:left;white-space:normal;min-width:160px">${esc(r.q)}</td>` +
+      `<td style="text-align:left;white-space:normal;min-width:240px">${esc(r.a.slice(0, 80))}${r.a.length > 80 ? "…" : ""}${r.stopped ? " (멈춤)" : ""}</td>` +
+      `<td>${r.sec.toFixed(1)}초</td><td>${r.first != null ? r.first.toFixed(1) + "초" : "-"}</td><td>${r.nTok ?? "-"}</td><td>${r.tps ? r.tps.toFixed(1) : "-"}</td><td>${r.ctx ? "켜짐" : "꺼짐"}</td></tr>`).join("") + "</tbody>";
+}
+
+function aiSaveTxt() {
+  if (!ai.log.length) { aiAddMsg("sys", "저장할 대화가 아직 없습니다."); return; }
+  const lines = [`대화형 AI 테스트 기록 (${new Date().toLocaleString("ko-KR")})`, `실행 엔진: WebLLM 0.2.79 (브라우저 WebGPU)`, ""];
+  ai.log.forEach((r, i) => lines.push(`[${i + 1}] 모델: ${r.model} · ${r.sec.toFixed(1)}초${r.nTok ? ` · 토큰 ${r.nTok}개 · 초당 ${r.tps.toFixed(1)}토큰` : ""}`, `질문: ${r.q}`, `답변: ${r.a}`, ""));
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([lines.join("\n")], { type: "text/plain;charset=utf-8" }));
+  a.download = "대화형AI_테스트기록.txt"; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+$("aiModel").addEventListener("change", aiRenderModelNote);
+$("aiLoad").addEventListener("click", aiLoadModel);
+$("aiSend").addEventListener("click", () => aiSend());
+$("aiInput").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); aiSend(); } });
+$("aiStop").addEventListener("click", () => { ai.stopReq = true; ai.engine?.interruptGenerate(); });
+$("aiExamples").addEventListener("click", e => { if (e.target.tagName === "BUTTON" && !e.target.disabled) aiSend(e.target.textContent); });
+$("aiClear").addEventListener("click", () => {
+  if (ai.busy) return;
+  ai.history = []; $("aiChat").innerHTML = ""; aiAddMsg("sys", "대화를 지웠습니다. 새로 질문해 보세요.");
+  ai.engine?.resetChat?.();
+});
+$("aiSave").addEventListener("click", aiSaveTxt);
+$("aiCtx").addEventListener("change", aiRefreshSysView);
+document.querySelector("#panel-ai details").addEventListener("toggle", aiRefreshSysView);
+aiEnableInput(false);
+
 // ---------------- 이벤트 연결
 document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click", () => {
   document.querySelectorAll(".tabs button").forEach(o => o.setAttribute("aria-selected", o === b));
   document.querySelectorAll(".panel").forEach(p => p.classList.toggle("active", p.id === "panel-" + b.dataset.tab));
   window.dispatchEvent(new Event("resize")); // 숨겨져 있던 그래프 크기 다시 맞추기
   if (b.dataset.tab === "nn" && !nnS.started && !nnS.running && state.x.length) nnTrain();   // 처음 열면 자동으로 학습
+  if (b.dataset.tab === "ai") aiSetup();
 }));
 ["xSel", "ySel", "dropNeg"].forEach(id => $(id).addEventListener("change", refresh));
 $("lrSel").addEventListener("change", () => state.x.length && renderLinear());
